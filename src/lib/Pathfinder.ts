@@ -1,5 +1,3 @@
-// src/lib/Pathfinder.ts
-
 interface Point {
   x: number
   y: number

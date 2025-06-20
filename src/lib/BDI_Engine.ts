@@ -1,5 +1,3 @@
-// src/lib/BDI_Engine.ts
-
 import { Desire, Intention } from './Intention.js'
 import config from '../config.js'
 import Logger from '../utils/Logger.js'

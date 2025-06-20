@@ -1,5 +1,3 @@
-// src/lib/BeliefSet.ts
-
 import config from '../config.js'
 import Logger from '../utils/Logger.js'
 

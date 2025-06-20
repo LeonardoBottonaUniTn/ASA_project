@@ -1,5 +1,3 @@
-// src/lib/Intention.ts
-
 import Logger from '../utils/Logger.js'
 const log = Logger('Intention')
 
