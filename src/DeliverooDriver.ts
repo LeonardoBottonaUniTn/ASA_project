@@ -3,7 +3,7 @@
 import config from './config.js'
 import Logger from './utils/Logger.js'
 import { DeliverooApi } from '@unitn-asa/deliveroo-js-client'
-import BeliefSet from './lib/BeliefSet.js'
+import BeliefSet, { TileType } from './lib/BeliefSet.js'
 import Pathfinder from './lib/Pathfinder.js'
 import BDI_Engine from './lib/BDI_Engine.js'
 import ActionHandler from './lib/ActionHandler.js'
@@ -39,17 +39,18 @@ async function main() {
     (
       width: number,
       height: number,
-      tiles: { x: number; y: number; delivery: boolean }[],
+      tiles: { x: number; y: number; type: number }[],
     ) => {
-      const grid: { delivery: boolean }[][] = Array(height)
+      const grid: { type: TileType }[][] = Array(height)
         .fill(null)
-        .map(() => Array(width).fill({ delivery: false }))
+        .map(() => Array(width).fill({ type: TileType.NonWalkable }))
       for (const tile of tiles) {
-        grid[tile.y][tile.x] = { delivery: tile.delivery }
+        grid[tile.y][tile.x] = { type: tile.type as TileType }
       }
       beliefSet.updateFromMap({ width, height, tiles: grid })
     },
   )
+
   client.onParcelsSensing(
     (
       parcels: {

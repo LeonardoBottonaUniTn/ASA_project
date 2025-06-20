@@ -1,7 +1,7 @@
 import { Desire, Intention } from './Intention.js'
 import config from '../config.js'
 import Logger from '../utils/Logger.js'
-import BeliefSet from './BeliefSet.js'
+import BeliefSet, { TileType } from './BeliefSet.js'
 import Pathfinder from './Pathfinder.js'
 import ActionHandler from './ActionHandler.js'
 
@@ -161,7 +161,7 @@ class BDI_Engine {
           x: Math.floor(Math.random() * width!),
           y: Math.floor(Math.random() * height!),
         }
-      } while (tiles![randomGoal.y][randomGoal.x].delivery)
+      } while (tiles![randomGoal.y][randomGoal.x].type === TileType.Delivery)
       return new Intention(exploreDesire.type, randomGoal)
     }
 

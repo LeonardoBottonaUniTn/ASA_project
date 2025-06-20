@@ -21,8 +21,14 @@ interface Parcel {
   carriedBy: string | null
 }
 
+export enum TileType {
+  NonWalkable = 0,
+  Walkable = 1,
+  Delivery = 2,
+}
+
 interface Tile {
-  delivery: boolean
+  type: TileType
 }
 
 interface Grid {
@@ -81,7 +87,7 @@ class BeliefSet {
     this.deliveryZones = []
     for (let i = 0; i < data.height; i++) {
       for (let j = 0; j < data.width; j++) {
-        if (data.tiles[i][j].delivery) {
+        if (data.tiles[i][j]?.type === TileType.Delivery) {
           this.deliveryZones.push({ x: j, y: i })
         }
       }
