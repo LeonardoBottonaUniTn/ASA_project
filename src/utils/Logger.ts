@@ -1,25 +1,27 @@
-// src/utils/Logger.js
+// src/utils/Logger.ts
 
-const { logging } = require('../config')
+import config from '../config'
 
-const levels = {
+const levels: { [key: string]: number } = {
   debug: 0,
   info: 1,
   warn: 2,
   error: 3,
 }
 
-const currentLevel = levels[logging.level] || levels.info
+const currentLevel = levels[config.logging.level] || levels.info
 
 /**
  * A simple logger utility.
  */
 class Logger {
-  constructor(context) {
+  private context: string
+
+  constructor(context: string) {
     this.context = context
   }
 
-  _log(level, message, ...args) {
+  private _log(level: string, message: any, ...args: any[]) {
     if (levels[level] >= currentLevel) {
       const timestamp = new Date().toISOString()
       console.log(
@@ -30,21 +32,21 @@ class Logger {
     }
   }
 
-  debug(message, ...args) {
+  public debug(message: any, ...args: any[]) {
     this._log('debug', message, ...args)
   }
 
-  info(message, ...args) {
+  public info(message: any, ...args: any[]) {
     this._log('info', message, ...args)
   }
 
-  warn(message, ...args) {
+  public warn(message: any, ...args: any[]) {
     this._log('warn', message, ...args)
   }
 
-  error(message, ...args) {
+  public error(message: any, ...args: any[]) {
     this._log('error', message, ...args)
   }
 }
 
-module.exports = (context) => new Logger(context)
+export default (context: string): Logger => new Logger(context)

@@ -1,11 +1,13 @@
-// src/lib/ActionHandler.js
+// src/lib/ActionHandler.ts
 
-const Logger = require('../utils/Logger')
+import Logger from '../utils/Logger'
 
 const log = Logger('ActionHandler')
 
 class ActionHandler {
-  constructor(api) {
+  private api: any
+
+  constructor(api: any) {
     this.api = api
   }
 
@@ -14,7 +16,7 @@ class ActionHandler {
    * @param {string} direction - 'up', 'down', 'left', or 'right'.
    * @returns {Promise<void>}
    */
-  async move(direction) {
+  async move(direction: string): Promise<void> {
     log.info(`Executing move: ${direction}`)
     return this.api.emitMove(direction)
   }
@@ -23,7 +25,7 @@ class ActionHandler {
    * Executes a pickup action.
    * @returns {Promise<void>}
    */
-  async pickup() {
+  async pickup(): Promise<void> {
     log.info('Executing pickup action.')
     return this.api.emitPickup()
   }
@@ -32,10 +34,10 @@ class ActionHandler {
    * Executes a drop/delivery action.
    * @returns {Promise<void>}
    */
-  async drop() {
+  async drop(): Promise<void> {
     log.info('Executing drop action.')
     return this.api.emitPutdown() // Assuming drop is putdown
   }
 }
 
-module.exports = ActionHandler
+export default ActionHandler

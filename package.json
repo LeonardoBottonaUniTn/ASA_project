@@ -2,8 +2,9 @@
   "name": "asa_project",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/DeliverooDriver.js",
   "scripts": {
+    "start": "tsc && node dist/DeliverooDriver.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -19,5 +20,9 @@
   "dependencies": {
     "@unitn-asa/deliveroo-js-client": "^2.0.3",
     "dotenv": "^16.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.3",
+    "typescript": "^5.8.3"
   }
 }

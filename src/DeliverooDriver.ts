@@ -1,12 +1,12 @@
 // Main entry point for the Deliveroo BDI Agent
 
-const config = require('./src/config')
-const Logger = require('./src/utils/Logger')
-const { DeliverooApi } = require('@unitn-asa/deliveroo-js-client')
-const BeliefSet = require('./src/lib/BeliefSet')
-const Pathfinder = require('./src/lib/Pathfinder')
-const BDI_Engine = require('./src/lib/BDI_Engine')
-const ActionHandler = require('./src/lib/ActionHandler')
+import config from './config'
+import Logger from './utils/Logger'
+import { DeliverooApi } from '@unitn-asa/deliveroo-js-client'
+import BeliefSet from './lib/BeliefSet'
+import Pathfinder from './lib/Pathfinder'
+import BDI_Engine from './lib/BDI_Engine'
+import ActionHandler from './lib/ActionHandler'
 
 const log = Logger('DeliverooDriver')
 
@@ -14,7 +14,7 @@ async function main() {
   log.info(`Deliveroo BDI Agent [${config.agent.name}] starting...`)
 
   // 1. Initialize connection
-  const client = new DeliverooApi(config.api.host, config.api.token)
+  const client = new DeliverooApi(config.api.host, config.api.token!)
   log.info('Connecting to Deliveroo API...')
 
   // 2. Instantiate core components

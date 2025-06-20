@@ -1,19 +1,52 @@
-// src/lib/BeliefSet.js
+// src/lib/BeliefSet.ts
 
-const { agent } = require('../config')
-const Logger = require('../utils/Logger')
+import config from '../config'
+import Logger from '../utils/Logger'
 
 const log = Logger('BeliefSet')
 
-class BeliefSet {
-  constructor() {
-    this.me = {} // { id, name, x, y, score }
-    this.carrying = null // The parcel object
-    this.grid = {} // { width, height, tiles }
-    this.parcels = new Map() // id -> { x, y, reward, carriedBy }
-    this.deliveryZones = [] // [{x, y}]
-    this.otherAgents = new Map() // id -> { x, y, score }
+// Type definitions
+interface Agent {
+  id: string
+  name: string
+  x: number
+  y: number
+  score: number
+  parcelId?: string
+}
 
+interface Parcel {
+  id: string
+  x: number
+  y: number
+  reward: number
+  carriedBy: string | null
+}
+
+interface Tile {
+  delivery: boolean
+}
+
+interface Grid {
+  width: number
+  height: number
+  tiles: Tile[][]
+}
+
+interface Point {
+  x: number
+  y: number
+}
+
+class BeliefSet {
+  me: Partial<Agent> = {}
+  carrying: Parcel | null = null
+  grid: Partial<Grid> = {}
+  parcels: Map<string, Parcel> = new Map()
+  deliveryZones: Point[] = []
+  otherAgents: Map<string, Agent> = new Map()
+
+  constructor() {
     // Log state periodically for debugging
     setInterval(() => {
       log.debug('Current Beliefs:', {
@@ -22,17 +55,18 @@ class BeliefSet {
         parcels: this.parcels.size,
         agents: this.otherAgents.size,
       })
-    }, agent.logInterval)
+    }, config.agent.logInterval)
   }
 
   /**
    * Updates agent's own state.
-   * @param {object} data - Data from onYou event.
+   * @param {Agent} data - Data from onYou event.
    */
-  updateFromYou(data) {
+  updateFromYou(data: Agent) {
     this.me = data
     if (data.parcelId) {
-      this.carrying = this.parcels.get(data.parcelId) || { id: data.parcelId }
+      this.carrying =
+        this.parcels.get(data.parcelId) || ({ id: data.parcelId } as Parcel)
     } else {
       this.carrying = null
     }
@@ -41,9 +75,9 @@ class BeliefSet {
 
   /**
    * Updates the map grid.
-   * @param {object} data - Data from onMap event.
+   * @param {Grid} data - Data from onMap event.
    */
-  updateFromMap(data) {
+  updateFromMap(data: Grid) {
     this.grid = data
     // Find delivery zones from the map tiles
     this.deliveryZones = []
@@ -61,10 +95,10 @@ class BeliefSet {
 
   /**
    * Updates the state of known parcels.
-   * @param {Array<object>} parcelsData - Data from onParcelsSensing event.
+   * @param {Parcel[]} parcelsData - Data from onParcelsSensing event.
    */
-  updateFromParcels(parcelsData) {
-    const seenParcels = new Set()
+  updateFromParcels(parcelsData: Parcel[]) {
+    const seenParcels = new Set<string>()
     for (const p of parcelsData) {
       this.parcels.set(p.id, p)
       seenParcels.add(p.id)
@@ -81,10 +115,10 @@ class BeliefSet {
 
   /**
    * Updates the state of other agents.
-   * @param {Array<object>} agentsData - Data from onAgentsSensing event.
+   * @param {Agent[]} agentsData - Data from onAgentsSensing event.
    */
-  updateFromAgents(data) {
-    const seenAgents = new Set()
+  updateFromAgents(data: Agent[]) {
+    const seenAgents = new Set<string>()
     for (const agent of data) {
       if (agent.id !== this.me.id) {
         this.otherAgents.set(agent.id, agent)
@@ -101,12 +135,12 @@ class BeliefSet {
   }
 
   // Utility methods can be added here, e.g.,
-  getParcel(id) {
+  getParcel(id: string): Parcel | undefined {
     return this.parcels.get(id)
   }
 
-  getClosestParcel(position) {
-    let closestParcel = null
+  getClosestParcel(position: Point): Parcel | null {
+    let closestParcel: Parcel | null = null
     let minDistance = Infinity
 
     for (const parcel of this.parcels.values()) {
@@ -123,4 +157,4 @@ class BeliefSet {
   }
 }
 
-module.exports = BeliefSet
+export default BeliefSet

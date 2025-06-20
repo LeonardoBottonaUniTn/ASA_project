@@ -1,17 +1,41 @@
-// src/lib/BDI_Engine.js
+// src/lib/BDI_Engine.ts
 
-const { Desire, Intention } = require('./Intention')
-const { agent } = require('../config')
-const Logger = require('../utils/Logger')
+import { Desire, Intention } from './Intention'
+import config from '../config'
+import Logger from '../utils/Logger'
+import BeliefSet from './BeliefSet'
+import Pathfinder from './Pathfinder'
+import ActionHandler from './ActionHandler'
 
 const log = Logger('BDI_Engine')
 
+interface Parcel {
+  id: string
+  x: number
+  y: number
+  reward: number
+  carriedBy: string | null
+}
+
+interface DesireType {
+  type: Desire
+  parcel?: Parcel
+}
+
 class BDI_Engine {
-  constructor(beliefSet, pathfinder, actionHandler) {
+  private beliefSet: BeliefSet
+  private pathfinder: Pathfinder
+  private actionHandler: ActionHandler
+  private currentIntention: Intention | null = null
+
+  constructor(
+    beliefSet: BeliefSet,
+    pathfinder: Pathfinder,
+    actionHandler: ActionHandler,
+  ) {
     this.beliefSet = beliefSet
     this.pathfinder = pathfinder
     this.actionHandler = actionHandler
-    this.currentIntention = null
   }
 
   /**
@@ -39,7 +63,7 @@ class BDI_Engine {
       if (newIntention) {
         this.currentIntention = newIntention
         log.info('New intention selected:', {
-          type: this.currentIntention.desire.type,
+          type: this.currentIntention.desire,
           goal: this.currentIntention.goal,
         })
       } else {
@@ -50,15 +74,15 @@ class BDI_Engine {
       if (this.currentIntention) {
         this.execute(this.currentIntention)
       }
-    }, agent.loopInterval)
+    }, config.agent.loopInterval)
   }
 
   /**
    * Generates a list of possible desires based on the current beliefs.
-   * @returns {Array<Desire>}
+   * @returns {DesireType[]}
    */
-  deliberate() {
-    const desires = []
+  deliberate(): DesireType[] {
+    const desires: DesireType[] = []
 
     if (this.beliefSet.carrying) {
       // Desire: Deliver the parcel we are carrying.
@@ -85,10 +109,10 @@ class BDI_Engine {
 
   /**
    * Filters desires to select the most pressing intention.
-   * @param {Array<Desire>} desires
-   * @returns {Intention}
+   * @param {DesireType[]} desires
+   * @returns {Intention | null}
    */
-  filter(desires) {
+  filter(desires: DesireType[]): Intention | null {
     if (desires.length === 0) return null
 
     // Priority: Deliver > Pickup > Explore
@@ -97,7 +121,7 @@ class BDI_Engine {
     )
     if (deliverDesire) {
       const deliveryZone = this.beliefSet.deliveryZones[0] // Assume one for now
-      return new Intention(deliverDesire, deliveryZone)
+      return new Intention(deliverDesire.type, deliveryZone)
     }
 
     const pickupDesires = desires.filter(
@@ -105,20 +129,20 @@ class BDI_Engine {
     )
     if (pickupDesires.length > 0) {
       // Find the closest parcel to pick up
-      let closestDesire = null
+      let closestDesire: DesireType | null = null
       let minDistance = Infinity
       for (const desire of pickupDesires) {
         const distance =
-          Math.abs(this.beliefSet.me.x - desire.parcel.x) +
-          Math.abs(this.beliefSet.me.y - desire.parcel.y)
+          Math.abs(this.beliefSet.me.x! - desire.parcel!.x) +
+          Math.abs(this.beliefSet.me.y! - desire.parcel!.y)
         if (distance < minDistance) {
           minDistance = distance
           closestDesire = desire
         }
       }
-      return new Intention(closestDesire, {
-        x: closestDesire.parcel.x,
-        y: closestDesire.parcel.y,
+      return new Intention(closestDesire!.type, {
+        x: closestDesire!.parcel!.x,
+        y: closestDesire!.parcel!.y,
       })
     }
 
@@ -131,11 +155,11 @@ class BDI_Engine {
       let randomGoal
       do {
         randomGoal = {
-          x: Math.floor(Math.random() * width),
-          y: Math.floor(Math.random() * height),
+          x: Math.floor(Math.random() * width!),
+          y: Math.floor(Math.random() * height!),
         }
-      } while (tiles[randomGoal.y][randomGoal.x].impassable)
-      return new Intention(exploreDesire, randomGoal)
+      } while (tiles![randomGoal.y][randomGoal.x].impassable)
+      return new Intention(exploreDesire.type, randomGoal)
     }
 
     return null
@@ -145,7 +169,7 @@ class BDI_Engine {
    * Executes the current intention.
    * @param {Intention} intention
    */
-  async execute(intention) {
+  async execute(intention: Intention) {
     if (intention.isFinished()) {
       this.currentIntention = null
       return
@@ -154,9 +178,14 @@ class BDI_Engine {
     const { me } = this.beliefSet
     const goal = intention.goal
 
+    if (!goal) {
+      intention.setFinished()
+      return
+    }
+
     // Are we at the goal?
     if (me.x === goal.x && me.y === goal.y) {
-      switch (intention.desire.type) {
+      switch (intention.desire) {
         case Desire.GO_TO_AND_PICKUP:
           await this.actionHandler.pickup()
           intention.setFinished()
@@ -172,8 +201,8 @@ class BDI_Engine {
     } else {
       // Not at the goal, find a path and move.
       const path = this.pathfinder.findPath(
-        this.beliefSet.grid,
-        { x: me.x, y: me.y },
+        this.beliefSet.grid as any, // Should be a full grid by now
+        { x: me.x!, y: me.y! },
         goal,
       )
       if (path && path.length > 0) {
@@ -194,4 +223,4 @@ class BDI_Engine {
   }
 }
 
-module.exports = BDI_Engine
+export default BDI_Engine
