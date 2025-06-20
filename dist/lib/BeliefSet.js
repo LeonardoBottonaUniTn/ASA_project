@@ -1,12 +1,7 @@
-"use strict";
 // src/lib/BeliefSet.ts
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const config_1 = __importDefault(require("../config"));
-const Logger_1 = __importDefault(require("../utils/Logger"));
-const log = (0, Logger_1.default)('BeliefSet');
+import config from '../config.js';
+import Logger from '../utils/Logger.js';
+const log = Logger('BeliefSet');
 class BeliefSet {
     constructor() {
         this.me = {};
@@ -23,7 +18,7 @@ class BeliefSet {
                 parcels: this.parcels.size,
                 agents: this.otherAgents.size,
             });
-        }, config_1.default.agent.logInterval);
+        }, config.agent.logInterval);
     }
     /**
      * Updates agent's own state.
@@ -113,4 +108,4 @@ class BeliefSet {
         return closestParcel;
     }
 }
-exports.default = BeliefSet;
+export default BeliefSet;

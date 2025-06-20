@@ -12,3 +12,6 @@ yarn-error.log*
 # Optional editor directories
 .idea
 .vscode
+
+# Build output
+dist/

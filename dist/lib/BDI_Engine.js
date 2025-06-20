@@ -1,13 +1,8 @@
-"use strict";
 // src/lib/BDI_Engine.ts
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const Intention_1 = require("./Intention");
-const config_1 = __importDefault(require("../config"));
-const Logger_1 = __importDefault(require("../utils/Logger"));
-const log = (0, Logger_1.default)('BDI_Engine');
+import { Desire, Intention } from './Intention.js';
+import config from '../config.js';
+import Logger from '../utils/Logger.js';
+const log = Logger('BDI_Engine');
 class BDI_Engine {
     constructor(beliefSet, pathfinder, actionHandler) {
         this.currentIntention = null;
@@ -45,7 +40,7 @@ class BDI_Engine {
             if (this.currentIntention) {
                 this.execute(this.currentIntention);
             }
-        }, config_1.default.agent.loopInterval);
+        }, config.agent.loopInterval);
     }
     /**
      * Generates a list of possible desires based on the current beliefs.
@@ -56,7 +51,7 @@ class BDI_Engine {
         if (this.beliefSet.carrying) {
             // Desire: Deliver the parcel we are carrying.
             desires.push({
-                type: Intention_1.Desire.DELIVER_CARRIED_PARCEL,
+                type: Desire.DELIVER_CARRIED_PARCEL,
                 parcel: this.beliefSet.carrying,
             });
         }
@@ -64,13 +59,13 @@ class BDI_Engine {
             // Desire: Go to and pick up any available parcel.
             for (const parcel of this.beliefSet.parcels.values()) {
                 if (!parcel.carriedBy) {
-                    desires.push({ type: Intention_1.Desire.GO_TO_AND_PICKUP, parcel });
+                    desires.push({ type: Desire.GO_TO_AND_PICKUP, parcel });
                 }
             }
         }
         // If no other desires, explore.
         if (desires.length === 0) {
-            desires.push({ type: Intention_1.Desire.EXPLORE_RANDOMLY });
+            desires.push({ type: Desire.EXPLORE_RANDOMLY });
         }
         return desires;
     }
@@ -80,15 +75,17 @@ class BDI_Engine {
      * @returns {Intention | null}
      */
     filter(desires) {
-        if (desires.length === 0)
+        if (desires.length === 0 ||
+            this.beliefSet.me.x === undefined ||
+            this.beliefSet.me.y === undefined)
             return null;
         // Priority: Deliver > Pickup > Explore
-        const deliverDesire = desires.find((d) => d.type === Intention_1.Desire.DELIVER_CARRIED_PARCEL);
-        if (deliverDesire) {
+        const deliverDesire = desires.find((d) => d.type === Desire.DELIVER_CARRIED_PARCEL);
+        if (deliverDesire && this.beliefSet.deliveryZones.length > 0) {
             const deliveryZone = this.beliefSet.deliveryZones[0]; // Assume one for now
-            return new Intention_1.Intention(deliverDesire.type, deliveryZone);
+            return new Intention(deliverDesire.type, deliveryZone);
         }
-        const pickupDesires = desires.filter((d) => d.type === Intention_1.Desire.GO_TO_AND_PICKUP);
+        const pickupDesires = desires.filter((d) => d.type === Desire.GO_TO_AND_PICKUP);
         if (pickupDesires.length > 0) {
             // Find the closest parcel to pick up
             let closestDesire = null;
@@ -101,12 +98,12 @@ class BDI_Engine {
                     closestDesire = desire;
                 }
             }
-            return new Intention_1.Intention(closestDesire.type, {
+            return new Intention(closestDesire.type, {
                 x: closestDesire.parcel.x,
                 y: closestDesire.parcel.y,
             });
         }
-        const exploreDesire = desires.find((d) => d.type === Intention_1.Desire.EXPLORE_RANDOMLY);
+        const exploreDesire = desires.find((d) => d.type === Desire.EXPLORE_RANDOMLY);
         if (exploreDesire) {
             // Pick a random tile to explore
             const { width, height, tiles } = this.beliefSet.grid;
@@ -116,8 +113,8 @@ class BDI_Engine {
                     x: Math.floor(Math.random() * width),
                     y: Math.floor(Math.random() * height),
                 };
-            } while (tiles[randomGoal.y][randomGoal.x].impassable);
-            return new Intention_1.Intention(exploreDesire.type, randomGoal);
+            } while (tiles[randomGoal.y][randomGoal.x].delivery);
+            return new Intention(exploreDesire.type, randomGoal);
         }
         return null;
     }
@@ -139,15 +136,15 @@ class BDI_Engine {
         // Are we at the goal?
         if (me.x === goal.x && me.y === goal.y) {
             switch (intention.desire) {
-                case Intention_1.Desire.GO_TO_AND_PICKUP:
+                case Desire.GO_TO_AND_PICKUP:
                     await this.actionHandler.pickup();
                     intention.setFinished();
                     break;
-                case Intention_1.Desire.DELIVER_CARRIED_PARCEL:
+                case Desire.DELIVER_CARRIED_PARCEL:
                     await this.actionHandler.drop();
                     intention.setFinished();
                     break;
-                case Intention_1.Desire.EXPLORE_RANDOMLY:
+                case Desire.EXPLORE_RANDOMLY:
                     intention.setFinished(); // Arrived at random spot
                     break;
             }
@@ -171,4 +168,4 @@ class BDI_Engine {
         }
     }
 }
-exports.default = BDI_Engine;
+export default BDI_Engine;

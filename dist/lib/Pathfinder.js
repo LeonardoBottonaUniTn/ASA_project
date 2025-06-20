@@ -1,6 +1,4 @@
-"use strict";
 // src/lib/Pathfinder.ts
-Object.defineProperty(exports, "__esModule", { value: true });
 class Pathfinder {
     /**
      * Finds a path from start to goal using Breadth-First Search.
@@ -50,4 +48,4 @@ class Pathfinder {
         return null; // No path found
     }
 }
-exports.default = Pathfinder;
+export default Pathfinder;

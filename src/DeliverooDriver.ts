@@ -1,12 +1,12 @@
 // Main entry point for the Deliveroo BDI Agent
 
-import config from './config'
-import Logger from './utils/Logger'
+import config from './config.js'
+import Logger from './utils/Logger.js'
 import { DeliverooApi } from '@unitn-asa/deliveroo-js-client'
-import BeliefSet from './lib/BeliefSet'
-import Pathfinder from './lib/Pathfinder'
-import BDI_Engine from './lib/BDI_Engine'
-import ActionHandler from './lib/ActionHandler'
+import BeliefSet from './lib/BeliefSet.js'
+import Pathfinder from './lib/Pathfinder.js'
+import BDI_Engine from './lib/BDI_Engine.js'
+import ActionHandler from './lib/ActionHandler.js'
 
 const log = Logger('DeliverooDriver')
 
@@ -25,12 +25,53 @@ async function main() {
 
   // 3. Register socket event listeners
   log.info('Registering event listeners...')
-  client.onYou((data) => beliefSet.updateFromYou(data))
-  client.onMap((width, height, tiles) =>
-    beliefSet.updateFromMap({ width, height, tiles }),
+  client.onYou(
+    (data: {
+      id: string
+      name: string
+      x: number
+      y: number
+      score: number
+      parcelId?: string
+    }) => beliefSet.updateFromYou(data),
   )
-  client.onParcelsSensing((parcels) => beliefSet.updateFromParcels(parcels))
-  client.onAgentsSensing((agents) => beliefSet.updateFromAgents(agents))
+  client.onMap(
+    (
+      width: number,
+      height: number,
+      tiles: { x: number; y: number; delivery: boolean }[],
+    ) => {
+      const grid: { delivery: boolean }[][] = Array(height)
+        .fill(null)
+        .map(() => Array(width).fill({ delivery: false }))
+      for (const tile of tiles) {
+        grid[tile.y][tile.x] = { delivery: tile.delivery }
+      }
+      beliefSet.updateFromMap({ width, height, tiles: grid })
+    },
+  )
+  client.onParcelsSensing(
+    (
+      parcels: {
+        id: string
+        x: number
+        y: number
+        carriedBy: string | null
+        reward: number
+      }[],
+    ) => beliefSet.updateFromParcels(parcels),
+  )
+  client.onAgentsSensing(
+    (
+      agents: {
+        id: string
+        name: string
+        x: number
+        y: number
+        score: number
+      }[],
+    ) => beliefSet.updateFromAgents(agents),
+  )
   client.onConnect(() =>
     log.info('Successfully connected and registered to the environment.'),
   )

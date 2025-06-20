@@ -1,11 +1,11 @@
 // src/lib/BDI_Engine.ts
 
-import { Desire, Intention } from './Intention'
-import config from '../config'
-import Logger from '../utils/Logger'
-import BeliefSet from './BeliefSet'
-import Pathfinder from './Pathfinder'
-import ActionHandler from './ActionHandler'
+import { Desire, Intention } from './Intention.js'
+import config from '../config.js'
+import Logger from '../utils/Logger.js'
+import BeliefSet from './BeliefSet.js'
+import Pathfinder from './Pathfinder.js'
+import ActionHandler from './ActionHandler.js'
 
 const log = Logger('BDI_Engine')
 
@@ -113,13 +113,18 @@ class BDI_Engine {
    * @returns {Intention | null}
    */
   filter(desires: DesireType[]): Intention | null {
-    if (desires.length === 0) return null
+    if (
+      desires.length === 0 ||
+      this.beliefSet.me.x === undefined ||
+      this.beliefSet.me.y === undefined
+    )
+      return null
 
     // Priority: Deliver > Pickup > Explore
     const deliverDesire = desires.find(
       (d) => d.type === Desire.DELIVER_CARRIED_PARCEL,
     )
-    if (deliverDesire) {
+    if (deliverDesire && this.beliefSet.deliveryZones.length > 0) {
       const deliveryZone = this.beliefSet.deliveryZones[0] // Assume one for now
       return new Intention(deliverDesire.type, deliveryZone)
     }
@@ -158,7 +163,7 @@ class BDI_Engine {
           x: Math.floor(Math.random() * width!),
           y: Math.floor(Math.random() * height!),
         }
-      } while (tiles![randomGoal.y][randomGoal.x].impassable)
+      } while (tiles![randomGoal.y][randomGoal.x].delivery)
       return new Intention(exploreDesire.type, randomGoal)
     }
 

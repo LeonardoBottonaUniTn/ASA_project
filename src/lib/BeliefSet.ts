@@ -1,7 +1,7 @@
 // src/lib/BeliefSet.ts
 
-import config from '../config'
-import Logger from '../utils/Logger'
+import config from '../config.js'
+import Logger from '../utils/Logger.js'
 
 const log = Logger('BeliefSet')
 

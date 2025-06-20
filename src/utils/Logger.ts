@@ -1,6 +1,6 @@
 // src/utils/Logger.ts
 
-import config from '../config'
+import config from '../config.js'
 
 const levels: { [key: string]: number } = {
   debug: 0,

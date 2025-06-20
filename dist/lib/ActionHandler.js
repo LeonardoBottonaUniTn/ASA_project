@@ -1,11 +1,6 @@
-"use strict";
 // src/lib/ActionHandler.ts
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const Logger_1 = __importDefault(require("../utils/Logger"));
-const log = (0, Logger_1.default)('ActionHandler');
+import Logger from '../utils/Logger.js';
+const log = Logger('ActionHandler');
 class ActionHandler {
     constructor(api) {
         this.api = api;
@@ -36,4 +31,4 @@ class ActionHandler {
         return this.api.emitPutdown(); // Assuming drop is putdown
     }
 }
-exports.default = ActionHandler;
+export default ActionHandler;
