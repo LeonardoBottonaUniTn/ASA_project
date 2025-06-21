@@ -1,26 +1,13 @@
 import { Intention } from './Intention.js'
 import config from '../config.js'
 import Logger from '../utils/Logger.js'
-import { TileType } from '../types/index.js'
+import { DesireType, TileType } from '../types/index.js'
 import BeliefSet from './BeliefSet.js'
 import Pathfinder from './Pathfinder.js'
 import ActionHandler from './ActionHandler.js'
-import { Desire } from '../types/index.js'
+import { Desire, Parcel } from '../types/index.js'
 
 const log = Logger('BDI_Engine')
-
-interface Parcel {
-  id: string
-  x: number
-  y: number
-  reward: number
-  carriedBy: string | null
-}
-
-interface DesireType {
-  type: Desire
-  parcel?: Parcel
-}
 
 class BDI_Engine {
   private beliefSet: BeliefSet
@@ -63,7 +50,7 @@ class BDI_Engine {
       if (newIntention) {
         this.currentIntention = newIntention
         log.info('New intention selected:', {
-          type: this.currentIntention.desire,
+          type: this.currentIntention.desireType,
           goal: this.currentIntention.goal,
         })
       } else {
@@ -79,29 +66,29 @@ class BDI_Engine {
 
   /**
    * Generates a list of possible desires based on the current beliefs.
-   * @returns {DesireType[]}
+   * @returns {Desire[]}
    */
-  deliberate(): DesireType[] {
-    const desires: DesireType[] = []
+  deliberate(): Desire[] {
+    const desires: Desire[] = []
 
     if (this.beliefSet.carrying) {
       // Desire: Deliver the parcel we are carrying.
       desires.push({
-        type: Desire.DELIVER_CARRIED_PARCEL,
+        type: DesireType.DELIVER_CARRIED_PARCEL,
         parcel: this.beliefSet.carrying,
       })
     } else {
       // Desire: Go to and pick up any available parcel.
       for (const parcel of this.beliefSet.parcels.values()) {
         if (!parcel.carriedBy) {
-          desires.push({ type: Desire.GO_TO_AND_PICKUP, parcel })
+          desires.push({ type: DesireType.GO_TO_AND_PICKUP, parcel })
         }
       }
     }
 
     // If no other desires, explore.
     if (desires.length === 0) {
-      desires.push({ type: Desire.EXPLORE_RANDOMLY })
+      desires.push({ type: DesireType.EXPLORE_RANDOMLY })
     }
 
     return desires
@@ -109,10 +96,10 @@ class BDI_Engine {
 
   /**
    * Filters desires to select the most pressing intention.
-   * @param {DesireType[]} desires
+   * @param {Desire[]} desires
    * @returns {Intention | null}
    */
-  filter(desires: DesireType[]): Intention | null {
+  filter(desires: Desire[]): Intention | null {
     if (
       desires.length === 0 ||
       this.beliefSet.me.x === undefined ||
@@ -122,7 +109,7 @@ class BDI_Engine {
 
     // Priority: Deliver > Pickup > Explore
     const deliverDesire = desires.find(
-      (d) => d.type === Desire.DELIVER_CARRIED_PARCEL,
+      (d) => d.type === DesireType.DELIVER_CARRIED_PARCEL,
     )
     if (deliverDesire && this.beliefSet.deliveryZones.length > 0) {
       const deliveryZone = this.beliefSet.deliveryZones[0] // Assume one for now
@@ -130,11 +117,11 @@ class BDI_Engine {
     }
 
     const pickupDesires = desires.filter(
-      (d) => d.type === Desire.GO_TO_AND_PICKUP,
+      (d) => d.type === DesireType.GO_TO_AND_PICKUP,
     )
     if (pickupDesires.length > 0) {
       // Find the closest parcel to pick up
-      let closestDesire: DesireType | null = null
+      let closestDesire: Desire | null = null
       let minDistance = Infinity
       for (const desire of pickupDesires) {
         const distance =
@@ -152,7 +139,7 @@ class BDI_Engine {
     }
 
     const exploreDesire = desires.find(
-      (d) => d.type === Desire.EXPLORE_RANDOMLY,
+      (d) => d.type === DesireType.EXPLORE_RANDOMLY,
     )
     if (exploreDesire) {
       // Pick a random tile to explore
@@ -190,16 +177,16 @@ class BDI_Engine {
 
     // Are we at the goal?
     if (me.x === goal.x && me.y === goal.y) {
-      switch (intention.desire) {
-        case Desire.GO_TO_AND_PICKUP:
+      switch (intention.desireType) {
+        case DesireType.GO_TO_AND_PICKUP:
           await this.actionHandler.pickup()
           intention.setFinished()
           break
-        case Desire.DELIVER_CARRIED_PARCEL:
+        case DesireType.DELIVER_CARRIED_PARCEL:
           await this.actionHandler.drop()
           intention.setFinished()
           break
-        case Desire.EXPLORE_RANDOMLY:
+        case DesireType.EXPLORE_RANDOMLY:
           intention.setFinished() // Arrived at random spot
           break
       }

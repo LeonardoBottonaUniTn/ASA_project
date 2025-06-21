@@ -41,8 +41,13 @@ export interface Point {
  * @readonly
  * @enum {string}
  */
-export enum Desire {
+export enum DesireType {
   GO_TO_AND_PICKUP = 'GO_TO_AND_PICKUP',
   DELIVER_CARRIED_PARCEL = 'DELIVER_CARRIED_PARCEL',
   EXPLORE_RANDOMLY = 'EXPLORE_RANDOMLY',
+}
+
+export interface Desire {
+  type: DesireType
+  parcel?: Parcel
 }
