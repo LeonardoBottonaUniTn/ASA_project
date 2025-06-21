@@ -3,10 +3,11 @@
 import config from './config.js'
 import Logger from './utils/Logger.js'
 import { DeliverooApi } from '@unitn-asa/deliveroo-js-client'
-import BeliefSet, { TileType } from './lib/BeliefSet.js'
+import BeliefSet from './lib/BeliefSet.js'
 import Pathfinder from './lib/Pathfinder.js'
 import BDI_Engine from './lib/BDI_Engine.js'
 import ActionHandler from './lib/ActionHandler.js'
+import { TileType } from './types/index.js'
 
 const log = Logger('DeliverooDriver')
 

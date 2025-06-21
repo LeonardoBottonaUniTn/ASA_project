@@ -1,46 +1,8 @@
 import config from '../config.js'
+import { Agent, Parcel, Grid, Point, TileType } from '../types/index.js'
 import Logger from '../utils/Logger.js'
 
 const log = Logger('BeliefSet')
-
-// Type definitions
-interface Agent {
-  id: string
-  name: string
-  x: number
-  y: number
-  score: number
-  parcelId?: string
-}
-
-interface Parcel {
-  id: string
-  x: number
-  y: number
-  reward: number
-  carriedBy: string | null
-}
-
-export enum TileType {
-  NonWalkable = 0,
-  Walkable = 1,
-  Delivery = 2,
-}
-
-interface Tile {
-  type: TileType
-}
-
-interface Grid {
-  width: number
-  height: number
-  tiles: Tile[][]
-}
-
-interface Point {
-  x: number
-  y: number
-}
 
 class BeliefSet {
   me: Partial<Agent> = {}

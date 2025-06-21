@@ -1,32 +1,17 @@
+import { Desire, Point } from '../types/index.js'
 import Logger from '../utils/Logger.js'
 const log = Logger('Intention')
 
-/**
- * Enum for desire types.
- * @readonly
- * @enum {string}
- */
-export enum Desire {
-  GO_TO_AND_PICKUP = 'GO_TO_AND_PICKUP',
-  DELIVER_CARRIED_PARCEL = 'DELIVER_CARRIED_PARCEL',
-  EXPLORE_RANDOMLY = 'EXPLORE_RANDOMLY',
-}
-
-interface Goal {
-  x: number
-  y: number
-}
-
 export class Intention {
   public desire: Desire
-  public goal: Goal | null
+  public goal: Point | null
   public finished: boolean
 
   /**
    * @param {Desire} desire - The underlying desire.
    * @param {object} goal - The target coordinates {x, y}.
    */
-  constructor(desire: Desire, goal: Goal | null) {
+  constructor(desire: Desire, goal: Point | null) {
     this.desire = desire
     this.goal = goal
     this.finished = false

@@ -1,9 +1,11 @@
-import { Desire, Intention } from './Intention.js'
+import { Intention } from './Intention.js'
 import config from '../config.js'
 import Logger from '../utils/Logger.js'
-import BeliefSet, { TileType } from './BeliefSet.js'
+import { TileType } from '../types/index.js'
+import BeliefSet from './BeliefSet.js'
 import Pathfinder from './Pathfinder.js'
 import ActionHandler from './ActionHandler.js'
+import { Desire } from '../types/index.js'
 
 const log = Logger('BDI_Engine')
 

@@ -1,17 +1,4 @@
-interface Point {
-  x: number
-  y: number
-}
-
-interface Tile {
-  impassable: boolean
-}
-
-interface Grid {
-  width: number
-  height: number
-  tiles: Tile[][]
-}
+import { Grid, Point, TileType } from '../types/index.js'
 
 class Pathfinder {
   /**
@@ -58,7 +45,7 @@ class Pathfinder {
           nextY >= 0 &&
           nextY < height &&
           !visited.has(nextKey) &&
-          !tiles[nextY][nextX].impassable // Check for obstacles
+          tiles[nextY][nextX].type !== TileType.NonWalkable // Check for obstacles
         ) {
           visited.add(nextKey)
           const newPath = [...current.path, move]
