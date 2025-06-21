@@ -1,4 +1,13 @@
-import { Grid, Point, TileType } from '../types/index.js'
+interface Point {
+  x: number
+  y: number
+}
+
+interface Grid {
+  width: number
+  height: number
+  tiles: [][]
+}
 
 class Pathfinder {
   /**
@@ -20,8 +29,8 @@ class Pathfinder {
     const visited = new Set([`${start.x},${start.y}`])
 
     const directions: { [key: string]: Point } = {
-      up: { x: 0, y: -1 },
-      down: { x: 0, y: 1 },
+      up: { x: 0, y: 1 },
+      down: { x: 0, y: -1 },
       left: { x: -1, y: 0 },
       right: { x: 1, y: 0 },
     }
@@ -45,7 +54,7 @@ class Pathfinder {
           nextY >= 0 &&
           nextY < height &&
           !visited.has(nextKey) &&
-          tiles[nextY][nextX].type !== TileType.NonWalkable // Check for obstacles
+          !(tiles[nextY][nextX] === 0) // Check for obstacles
         ) {
           visited.add(nextKey)
           const newPath = [...current.path, move]

@@ -46,7 +46,9 @@ async function main() {
         .fill(null)
         .map(() => Array(width).fill({ type: TileType.NonWalkable }))
       for (const tile of tiles) {
-        grid[tile.y][tile.x] = { type: tile.type as TileType }
+        // Invert the y coordinate to flip the map vertically
+        const flippedY = height - 1 - tile.y
+        grid[flippedY][tile.x] = { type: tile.type as TileType }
       }
       beliefSet.updateFromMap({ width, height, tiles: grid })
     },
