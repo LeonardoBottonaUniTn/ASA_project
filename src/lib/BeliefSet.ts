@@ -55,7 +55,11 @@ class BeliefSet {
       }
     }
     log.info(
-      `Map updated: ${data.width}x${data.height}. Delivery zones found: ${this.deliveryZones.length}`,
+      `Map updated: ${data.width}x${data.height}. Delivery zones found: ${this.deliveryZones.length}\n`,
+      //print the grid for debugging
+      data.tiles
+        .map((row) => row.map((tile) => tile.type).join(' '))
+        .join('\n'),
     )
   }
 
