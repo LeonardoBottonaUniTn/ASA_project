@@ -192,10 +192,18 @@ class BDI_Engine {
       }
     } else {
       // Not at the goal, find a path and move.
-      const path = this.pathfinder.findPath(
+      const path = await this.pathfinder.findPath(
         this.beliefSet.grid as any, // Should be a full grid by now
         { x: me.x!, y: me.y! },
         goal,
+      )
+      log.info(
+        'Path to goal:',
+        intention.goal,
+        'from',
+        { x: me.x, y: me.y },
+        'is',
+        path,
       )
       if (path && path.length > 0) {
         const nextMove = path[0]
