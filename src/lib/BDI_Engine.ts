@@ -205,8 +205,8 @@ class BDI_Engine {
         'is',
         path,
       )
-      if (path && path.length > 0) {
-        const nextMove = path[0]
+      if (path && path.moves.length > 0) {
+        const nextMove = path.moves[0]
         await this.actionHandler.move(nextMove)
       } else {
         log.warn(

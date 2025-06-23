@@ -51,3 +51,8 @@ export interface Desire {
   type: DesireType
   parcel?: Parcel
 }
+
+export interface Path {
+  moves: string[]
+  cost: number
+}
