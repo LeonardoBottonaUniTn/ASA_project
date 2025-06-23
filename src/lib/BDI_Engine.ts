@@ -5,7 +5,7 @@ import { DesireType, TileType } from '../types/index.js'
 import BeliefSet from './BeliefSet.js'
 import Pathfinder from './Pathfinder.js'
 import ActionHandler from './ActionHandler.js'
-import { Desire, Parcel } from '../types/index.js'
+import { Desire } from '../types/index.js'
 
 const log = Logger('BDI_Engine')
 
@@ -74,7 +74,7 @@ class BDI_Engine {
     if (this.beliefSet.carrying) {
       // Desire: Deliver the parcel we are carrying.
       desires.push({
-        type: DesireType.DELIVER_CARRIED_PARCEL,
+        type: DesireType.DELIVER_CARRIED_PARCELS,
         parcel: this.beliefSet.carrying,
       })
     } else {
@@ -109,7 +109,7 @@ class BDI_Engine {
 
     // Priority: Deliver > Pickup > Explore
     const deliverDesire = desires.find(
-      (d) => d.type === DesireType.DELIVER_CARRIED_PARCEL,
+      (d) => d.type === DesireType.DELIVER_CARRIED_PARCELS,
     )
     if (deliverDesire && this.beliefSet.deliveryZones.length > 0) {
       const deliveryZone = this.beliefSet.deliveryZones[0] // Assume one for now
@@ -182,7 +182,7 @@ class BDI_Engine {
           await this.actionHandler.pickup()
           intention.setFinished()
           break
-        case DesireType.DELIVER_CARRIED_PARCEL:
+        case DesireType.DELIVER_CARRIED_PARCELS:
           await this.actionHandler.drop()
           intention.setFinished()
           break

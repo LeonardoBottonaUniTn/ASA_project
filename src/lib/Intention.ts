@@ -9,7 +9,7 @@ export class Intention {
 
   /**
    * @param {DesireType} desire - The underlying desire.
-   * @param {object} goal - The target coordinates {x, y}.
+   * @param {Point} goal - The target coordinates {x, y}.
    */
   constructor(desireType: DesireType, goal: Point | null) {
     this.desireType = desireType

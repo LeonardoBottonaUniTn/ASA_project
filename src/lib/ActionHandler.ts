@@ -29,12 +29,12 @@ class ActionHandler {
   }
 
   /**
-   * Executes a drop/delivery action.
+   * Executes a delivery action.
    * @returns {Promise<void>}
    */
   async drop(): Promise<void> {
     log.info('Executing drop action.')
-    return this.api.emitPutdown() // Assuming drop is putdown
+    return this.api.emitPutdown()
   }
 }
 

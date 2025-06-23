@@ -26,6 +26,7 @@ async function main() {
 
   // 3. Register socket event listeners
   log.info('Registering event listeners...')
+
   client.onYou(
     (data: {
       id: string
@@ -36,6 +37,8 @@ async function main() {
       parcelId?: string
     }) => beliefSet.updateFromYou(data),
   )
+
+  // this event is triggered once when the agent connects to the environment
   client.onMap(
     (
       width: number,
