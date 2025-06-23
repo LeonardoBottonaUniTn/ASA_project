@@ -1,5 +1,6 @@
 import Logger from '../utils/Logger.js'
-import { Grid, Point, TileType, Path } from '../types/index.js'
+import { Grid, Point, TileType, Path, Heuristic } from '../types/index.js'
+import { manhattanDistance } from './heuristics.js'
 
 const log = Logger('Pathfinder')
 
@@ -86,16 +87,16 @@ class Pathfinder {
     return { x: parts[0], y: parts[1] }
   }
 
-  // Heuristic function (Manhattan distance) for A*
-  heuristic(a: Point, b: Point): number {
-    return Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
-  }
-
   samePoint(p1: Point, p2: Point): boolean {
     return p1.x === p2.x && p1.y === p2.y
   }
 
-  async findPath(grid: Grid, start: Point, goal: Point): Promise<Path | null> {
+  async findPath(
+    grid: Grid,
+    start: Point,
+    goal: Point,
+    heuristic: Heuristic = manhattanDistance,
+  ): Promise<Path | null> {
     if (!grid.tiles || !start || !goal) {
       log.warn(
         'findPath called with incomplete information (grid, start, or goal missing).',
@@ -128,7 +129,7 @@ class Pathfinder {
     const pq = new PriorityQueue<Point>()
 
     distances.set(this.pointToKey(start), 0)
-    pq.enqueue(start, 0) // Priority is f_cost = g_cost + h_cost
+    pq.enqueue(start, heuristic(start, goal)) // Priority is f_cost = g_cost (0) + h_cost
 
     while (!pq.isEmpty()) {
       const currentPoint = pq.dequeue()
@@ -153,7 +154,7 @@ class Pathfinder {
         return { moves: path, cost: distances.get(currentKey) || path.length }
       }
 
-      const currentDistance = distances.get(currentKey) || Infinity
+      const currentDistance = distances.get(currentKey) ?? Infinity
 
       const neighbors = this.getNeighbors(currentPoint, grid)
 
@@ -164,7 +165,7 @@ class Pathfinder {
         if (newDistance < (distances.get(neighborKey) || Infinity)) {
           distances.set(neighborKey, newDistance)
           previous.set(neighborKey, { point: currentPoint, move })
-          const priority = newDistance + this.heuristic(neighborPoint, goal) // f_cost = g_cost + h_cost
+          const priority = newDistance + heuristic(neighborPoint, goal) // f_cost = g_cost + h_cost
           pq.enqueue(neighborPoint, priority)
         }
       }
