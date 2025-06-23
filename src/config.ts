@@ -1,5 +1,6 @@
 import dotenv from 'dotenv'
 import path from 'path'
+import { LogLevel, logLevels } from './types/index.js'
 
 dotenv.config({
   path: path.resolve(process.cwd(), '.env'),
@@ -19,7 +20,7 @@ interface Config {
     algorithm: string
   }
   logging: {
-    level: string
+    level: LogLevel
   }
 }
 
@@ -47,8 +48,12 @@ const config: Config = {
 
   // Debugging and logging
   logging: {
-    level: 'info', // e.g., 'debug', 'info', 'warn', 'error'
+    level: 'debug', // e.g., 'debug', 'info', 'warn', 'error'
   },
+}
+
+if (!logLevels.includes(config.logging.level)) {
+  throw new Error(`Invalid log level: ${config.logging.level}`)
 }
 
 export default config

@@ -56,3 +56,10 @@ export interface Path {
   moves: string[]
   cost: number
 }
+
+export interface Heuristic {
+  (a: Point, b: Point): number
+}
+
+export const logLevels = ['debug', 'info', 'warn', 'error'] as const
+export type LogLevel = (typeof logLevels)[number]
