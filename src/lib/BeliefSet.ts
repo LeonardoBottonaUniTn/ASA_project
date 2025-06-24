@@ -5,12 +5,12 @@ import Logger from '../utils/Logger.js'
 const log = Logger('BeliefSet')
 
 class BeliefSet {
-  me: Partial<Agent> = {}
-  carrying: Parcel | null = null
-  grid: Partial<Grid> = {}
-  parcels: Map<string, Parcel> = new Map()
-  deliveryZones: Point[] = []
-  otherAgents: Map<string, Agent> = new Map()
+  private me: Partial<Agent> = {}
+  private carrying: Parcel | null = null
+  private grid: Partial<Grid> = {}
+  private parcels: Map<string, Parcel> = new Map()
+  private deliveryZones: Point[] = []
+  private otherAgents: Map<string, Agent> = new Map()
 
   constructor() {
     // Log state periodically for debugging
@@ -22,6 +22,63 @@ class BeliefSet {
         agents: this.otherAgents.size,
       })
     }, config.agent.logInterval)
+  }
+
+  /**
+   * Returns the current agent's state.
+   * @returns {Partial<Agent>}
+   */
+  getMe(): Partial<Agent> {
+    return this.me
+  }
+
+  /**
+   * Returns the current agent's carrying state.
+   * @returns {Parcel | null}
+   */
+  getCarrying(): Parcel | null {
+    return this.carrying
+  }
+
+  /**
+   * Updates the agent's carrying state.
+   * @param {Parcel | null} parcel - The parcel being carried or null if not carrying.
+   */
+  setCarrying(parcel: Parcel | null) {
+    this.carrying = parcel
+    log.info(`Carrying updated: ${!!this.carrying}`)
+  }
+
+  /**
+   * Returns the current map grid.
+   * @returns {Partial<Grid>}
+   */
+  getGrid(): Partial<Grid> {
+    return this.grid
+  }
+
+  /**
+   * Returns the list of parcels.
+   * @returns {Map<string, Parcel>}
+   */
+  getParcels(): Map<string, Parcel> {
+    return this.parcels
+  }
+
+  /**
+   * Returns the list of other agents.
+   * @returns {Map<string, Agent>}
+   */
+  getOtherAgents(): Map<string, Agent> {
+    return this.otherAgents
+  }
+
+  /**
+   * Returns the list of delivery zones.
+   * @returns {Point[]}
+   */
+  getDeliveryZones(): Point[] {
+    return this.deliveryZones
   }
 
   /**
