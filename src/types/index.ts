@@ -4,7 +4,6 @@ export interface Agent {
   x: number
   y: number
   score: number
-  parcelId?: string
 }
 
 export interface Parcel {

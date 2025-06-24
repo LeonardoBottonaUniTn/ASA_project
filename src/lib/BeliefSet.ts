@@ -30,12 +30,6 @@ class BeliefSet {
    */
   updateFromYou(data: Agent) {
     this.me = data
-    if (data.parcelId) {
-      this.carrying =
-        this.parcels.get(data.parcelId) || ({ id: data.parcelId } as Parcel)
-    } else {
-      this.carrying = null
-    }
     log.info('Agent state updated:', this.me)
   }
 

@@ -28,14 +28,8 @@ async function main() {
   log.info('Registering event listeners...')
 
   client.onYou(
-    (data: {
-      id: string
-      name: string
-      x: number
-      y: number
-      score: number
-      parcelId?: string
-    }) => beliefSet.updateFromYou(data),
+    (data: { id: string; name: string; x: number; y: number; score: number }) =>
+      beliefSet.updateFromYou(data),
   )
 
   // this event is triggered once when the agent connects to the environment
