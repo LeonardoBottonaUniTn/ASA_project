@@ -55,7 +55,7 @@ async function main() {
         id: string
         x: number
         y: number
-        carriedBy: string | null
+        carriedBy?: string
         reward: number
       }[],
     ) => beliefSet.updateFromParcels(parcels),
