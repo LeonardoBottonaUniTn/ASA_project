@@ -12,27 +12,29 @@ class ActionHandler {
   /**
    * Executes a move action.
    * @param {string} direction - 'up', 'down', 'left', or 'right'.
-   * @returns {Promise<void>}
+   * @returns {Promise<{x: number, y: number} | false>}
    */
-  async move(direction: string): Promise<void> {
+  async move(
+    direction: 'up' | 'down' | 'left' | 'right' | { x: number; y: number },
+  ): Promise<{ x: number; y: number } | false> {
     log.info(`Executing move: ${direction}`)
     return this.api.emitMove(direction)
   }
 
   /**
    * Executes a pickup action.
-   * @returns {Promise<void>}
+   * @returns {Promise<{id: string}[]>}
    */
-  async pickup(): Promise<void> {
+  async pickup(): Promise<{ id: string }[]> {
     log.info('Executing pickup action.')
     return this.api.emitPickup()
   }
 
   /**
    * Executes a delivery action.
-   * @returns {Promise<void>}
+   * @returns {Promise<{id: string}[]>}
    */
-  async drop(): Promise<void> {
+  async drop(): Promise<{ id: string }[]> {
     log.info('Executing drop action.')
     return this.api.emitPutdown()
   }
