@@ -1,7 +1,7 @@
 import { Intention } from './Intention.js'
 import config from '../config.js'
 import Logger from '../utils/Logger.js'
-import { DesireType, TileType } from '../types/index.js'
+import { DesireType, Grid, TileType } from '../types/index.js'
 import BeliefSet from './BeliefSet.js'
 import Pathfinder from './Pathfinder.js'
 import ActionHandler from './ActionHandler.js'
@@ -71,15 +71,15 @@ class BDI_Engine {
   deliberate(): Desire[] {
     const desires: Desire[] = []
 
-    if (this.beliefSet.carrying) {
+    if (this.beliefSet.getCarrying()) {
       // Desire: Deliver the parcel we are carrying.
       desires.push({
         type: DesireType.DELIVER_CARRIED_PARCELS,
-        parcel: this.beliefSet.carrying,
+        parcel: this.beliefSet.getCarrying()!,
       })
     } else {
       // Desire: Go to and pick up any available parcel.
-      for (const parcel of this.beliefSet.parcels.values()) {
+      for (const parcel of this.beliefSet.getParcels().values()) {
         if (!parcel.carriedBy) {
           desires.push({ type: DesireType.GO_TO_AND_PICKUP, parcel })
         }
@@ -102,8 +102,8 @@ class BDI_Engine {
   filter(desires: Desire[]): Intention | null {
     if (
       desires.length === 0 ||
-      this.beliefSet.me.x === undefined ||
-      this.beliefSet.me.y === undefined
+      this.beliefSet.getMe().x === undefined ||
+      this.beliefSet.getMe().y === undefined
     )
       return null
 
@@ -111,8 +111,13 @@ class BDI_Engine {
     const deliverDesire = desires.find(
       (d) => d.type === DesireType.DELIVER_CARRIED_PARCELS,
     )
-    if (deliverDesire && this.beliefSet.deliveryZones.length > 0) {
-      const deliveryZone = this.beliefSet.deliveryZones[0] // Assume one for now
+    if (deliverDesire && this.beliefSet.getDeliveryZones().length > 0) {
+      // Assume one delivery zone for now..
+      // @TODO: get closest delivery zone or the one which
+      // maximizes the reward considering nearby parcels and expiration times of
+      // those I already picked up
+      const deliveryZone = this.beliefSet.getDeliveryZones()[0]
+
       return new Intention(deliverDesire.type, deliveryZone)
     }
 
@@ -125,8 +130,8 @@ class BDI_Engine {
       let minDistance = Infinity
       for (const desire of pickupDesires) {
         const distance =
-          Math.abs(this.beliefSet.me.x! - desire.parcel!.x) +
-          Math.abs(this.beliefSet.me.y! - desire.parcel!.y)
+          Math.abs(this.beliefSet.getMe().x! - desire.parcel!.x) +
+          Math.abs(this.beliefSet.getMe().y! - desire.parcel!.y)
         if (distance < minDistance) {
           minDistance = distance
           closestDesire = desire
@@ -143,7 +148,7 @@ class BDI_Engine {
     )
     if (exploreDesire) {
       // Pick a random tile to explore
-      const { width, height, tiles } = this.beliefSet.grid
+      const { width, height, tiles } = this.beliefSet.getGrid()
       let randomGoal
       do {
         randomGoal = {
@@ -167,7 +172,7 @@ class BDI_Engine {
       return
     }
 
-    const { me } = this.beliefSet
+    const me = this.beliefSet.getMe()
     const goal = intention.goal
 
     if (!goal) {
@@ -179,11 +184,20 @@ class BDI_Engine {
     if (me.x === goal.x && me.y === goal.y) {
       switch (intention.desireType) {
         case DesireType.GO_TO_AND_PICKUP:
-          await this.actionHandler.pickup()
-          intention.setFinished()
+          const pickedParcelsIds = await this.actionHandler.pickup()
+          const pickedParcelId = pickedParcelsIds[0].id
+
+          const pickedParcel = await this.beliefSet.getParcel(pickedParcelId)
+
+          if (pickedParcel) {
+            this.beliefSet.setCarrying(pickedParcel)
+            intention.setFinished()
+          }
+
           break
         case DesireType.DELIVER_CARRIED_PARCELS:
           await this.actionHandler.drop()
+          this.beliefSet.setCarrying(null)
           intention.setFinished()
           break
         case DesireType.EXPLORE_RANDOMLY:
@@ -193,11 +207,11 @@ class BDI_Engine {
     } else {
       // Not at the goal, find a path and move.
       const path = await this.pathfinder.findPath(
-        this.beliefSet.grid as any, // Should be a full grid by now
+        this.beliefSet.getGrid() as Grid,
         { x: me.x!, y: me.y! },
         goal,
       )
-      log.info(
+      log.debug(
         'Path to goal:',
         intention.goal,
         'from',
