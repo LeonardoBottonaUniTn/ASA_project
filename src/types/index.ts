@@ -11,7 +11,7 @@ export interface Parcel {
   x: number
   y: number
   reward: number
-  carriedBy: string | null
+  carriedBy?: string
 }
 
 export enum TileType {
@@ -51,8 +51,15 @@ export interface Desire {
   parcel?: Parcel
 }
 
+export enum Move {
+  UP = 'up',
+  DOWN = 'down',
+  LEFT = 'left',
+  RIGHT = 'right',
+}
+
 export interface Path {
-  moves: string[]
+  moves: (Move | Point)[]
   cost: number
 }
 

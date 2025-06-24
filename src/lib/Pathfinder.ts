@@ -1,5 +1,5 @@
 import Logger from '../utils/Logger.js'
-import { Grid, Point, TileType, Path, Heuristic } from '../types/index.js'
+import { Grid, Point, TileType, Path, Heuristic, Move } from '../types/index.js'
 import { manhattanDistance } from './heuristics.js'
 
 const log = Logger('Pathfinder')
@@ -48,17 +48,14 @@ class Pathfinder {
     return { x: x, y: y, type: grid.tiles[y][x].type } // Return tile type
   }
 
-  getNeighbors(
-    currentNode: Point,
-    grid: Grid,
-  ): { point: Point; move: string }[] {
+  getNeighbors(currentNode: Point, grid: Grid): { point: Point; move: Move }[] {
     const directions = [
-      { dx: 0, dy: 1, move: 'up' },
-      { dx: 0, dy: -1, move: 'down' },
-      { dx: -1, dy: 0, move: 'left' },
-      { dx: 1, dy: 0, move: 'right' },
+      { dx: 0, dy: 1, move: Move.UP },
+      { dx: 0, dy: -1, move: Move.DOWN },
+      { dx: -1, dy: 0, move: Move.LEFT },
+      { dx: 1, dy: 0, move: Move.RIGHT },
     ]
-    const neighbors: { point: Point; move: string }[] = []
+    const neighbors: { point: Point; move: Move }[] = []
 
     for (const { dx, dy, move } of directions) {
       const neighborNode = this.getNode(
@@ -125,7 +122,7 @@ class Pathfinder {
     }
 
     const distances = new Map<string, number>() // Stores the shortest distance from start to each node
-    const previous = new Map<string, { point: Point; move: string }>() // Stores the previous node and the move to get there
+    const previous = new Map<string, { point: Point; move: Move }>() // Stores the previous node and the move to get there
     const pq = new PriorityQueue<Point>()
 
     distances.set(this.pointToKey(start), 0)
@@ -138,7 +135,7 @@ class Pathfinder {
       const currentKey = this.pointToKey(currentPoint)
 
       if (this.samePoint(currentPoint, goal)) {
-        const path: string[] = []
+        const path: Move[] = []
         let tempCurrent: Point = goal
         while (!this.samePoint(tempCurrent, start)) {
           const prevInfo = previous.get(this.pointToKey(tempCurrent))
