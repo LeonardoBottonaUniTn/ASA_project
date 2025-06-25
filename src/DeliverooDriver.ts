@@ -7,7 +7,7 @@ import BeliefSet from './lib/BeliefSet.js'
 import Pathfinder from './lib/Pathfinder.js'
 import BDI_Engine from './lib/BDI_Engine.js'
 import ActionHandler from './lib/ActionHandler.js'
-import { TileType } from './types/index.js'
+import { GameConfig, TileType } from './types/index.js'
 
 const log = Logger('DeliverooDriver')
 
@@ -26,6 +26,10 @@ async function main() {
 
   // 3. Register socket event listeners
   log.info('Registering event listeners...')
+
+  client.onConfig((config: GameConfig) => {
+    beliefSet.updateFromConfig(config)
+  })
 
   client.onYou(
     (data: { id: string; name: string; x: number; y: number; score: number }) =>

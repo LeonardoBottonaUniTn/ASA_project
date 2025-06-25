@@ -1,5 +1,12 @@
 import config from '../config.js'
-import { Agent, Parcel, Grid, Point, TileType } from '../types/index.js'
+import {
+  Agent,
+  Parcel,
+  Grid,
+  Point,
+  TileType,
+  GameConfig,
+} from '../types/index.js'
 import Logger from '../utils/Logger.js'
 
 const log = Logger('BeliefSet')
@@ -11,6 +18,7 @@ class BeliefSet {
   private parcels: Map<string, Parcel> = new Map()
   private deliveryZones: Point[] = []
   private otherAgents: Map<string, Agent> = new Map()
+  private config: Partial<GameConfig> = {}
 
   constructor() {
     // Log state periodically for debugging
@@ -46,7 +54,6 @@ class BeliefSet {
    */
   setCarrying(parcel: Parcel | null) {
     this.carrying = parcel
-    log.info(`Carrying updated: ${!!this.carrying}`)
   }
 
   /**
@@ -79,6 +86,14 @@ class BeliefSet {
    */
   getDeliveryZones(): Point[] {
     return this.deliveryZones
+  }
+
+  /**
+   * Updates the simulation config.
+   * @param {GameConfig} data - Data from onConfig event.
+   */
+  updateFromConfig(data: GameConfig) {
+    this.config = data
   }
 
   /**
