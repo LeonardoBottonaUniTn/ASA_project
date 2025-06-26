@@ -89,6 +89,14 @@ class BeliefSet {
   }
 
   /**
+   * Returns the current simulation config.
+   * @returns {Partial<GameConfig>}
+   */
+  getConfig(): Partial<GameConfig> {
+    return this.config
+  }
+
+  /**
    * Updates the simulation config.
    * @param {GameConfig} data - Data from onConfig event.
    */
