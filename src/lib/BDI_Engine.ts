@@ -180,7 +180,10 @@ class BDI_Engine {
           x: Math.floor(Math.random() * width!),
           y: Math.floor(Math.random() * height!),
         }
-      } while (tiles![randomGoal.y][randomGoal.x].type === TileType.Delivery)
+      } while (
+        tiles![randomGoal.y][randomGoal.x].type === TileType.Delivery ||
+        tiles![randomGoal.y][randomGoal.x].type === TileType.NonWalkable
+      )
       return new Intention(exploreDesire.type, randomGoal)
     }
 
@@ -213,15 +216,14 @@ class BDI_Engine {
       switch (intention.desireType) {
         case DesireType.GO_TO_AND_PICKUP:
           const pickedParcelsIds = await this.actionHandler.pickup()
-          const pickedParcelId = pickedParcelsIds[0].id
-
-          const pickedParcel = await this.beliefSet.getParcel(pickedParcelId)
-
-          if (pickedParcel) {
-            this.beliefSet.setCarrying(pickedParcel)
-            intention.setFinished()
+          if (pickedParcelsIds.length > 0) {
+            const pickedParcelId = pickedParcelsIds[0].id
+            const pickedParcel = this.beliefSet.getParcel(pickedParcelId)
+            if (pickedParcel) {
+              this.beliefSet.setCarrying(pickedParcel)
+            }
           }
-
+          intention.setFinished()
           break
         case DesireType.DELIVER_CARRIED_PARCELS:
           await this.actionHandler.drop()
@@ -239,14 +241,7 @@ class BDI_Engine {
         { x: Math.round(me.x!), y: Math.round(me.y!) },
         goal,
       )
-      log.debug(
-        'Path to goal:',
-        intention.goal,
-        'from',
-        { x: me.x, y: me.y },
-        'is',
-        path,
-      )
+
       if (path && path.moves.length > 0) {
         const nextMove = path.moves[0]
         await this.actionHandler.move(nextMove)
