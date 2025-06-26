@@ -16,9 +16,6 @@ interface Config {
     loopInterval: number
     logInterval: number
   }
-  pathfinder: {
-    algorithm: string
-  }
   logging: {
     level: LogLevel
   }
@@ -35,20 +32,14 @@ const config: Config = {
   agent: {
     name: 'BDI-Agent-007',
     // The interval (in milliseconds) for the BDI engine's main loop
-    loopInterval: 500,
+    loopInterval: 50,
     // The interval (in milliseconds) for logging the agent's belief state
     logInterval: 10000,
   },
 
-  // Pathfinder settings
-  pathfinder: {
-    // 'bfs' or 'astar' (once implemented)
-    algorithm: 'bfs',
-  },
-
   // Debugging and logging
   logging: {
-    level: 'debug', // e.g., 'debug', 'info', 'warn', 'error'
+    level: 'info', // e.g., 'debug', 'info', 'warn', 'error'
   },
 }
 
