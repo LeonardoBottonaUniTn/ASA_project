@@ -19,11 +19,14 @@ import {
 
 const log = Logger('BDI_Engine')
 
+const INTENTION_SWITCH_PENALTY_MS = 200 // 5 seconds penalty
+
 class BDI_Engine {
   private beliefSet: BeliefSet
   private pathfinder: Pathfinder
   private actionHandler: ActionHandler
   private currentIntention: Intention | null = null
+  private lastIntentionSwitchTimestamp = 0
 
   constructor(
     beliefSet: BeliefSet,
@@ -40,10 +43,18 @@ class BDI_Engine {
    */
   run() {
     setInterval(async () => {
-      // If there's an ongoing intention, let it finish
-      if (this.currentIntention && !this.currentIntention.isFinished()) {
-        this.execute(this.currentIntention)
-        return
+      // If there's an ongoing intention and it's an EXPLORE intention,
+      // check for new parcels and stop exploring if any are found
+      if (
+        this.currentIntention &&
+        !this.currentIntention.isFinished() &&
+        this.currentIntention.desireType === DesireType.EXPLORE_RANDOMLY &&
+        this.beliefSet.getParcels().size > 0
+      ) {
+        log.info(
+          'New parcels detected during exploration, stopping exploration',
+        )
+        this.currentIntention.setFinished()
       }
 
       // 1. SENSE: Beliefs are updated externally.
@@ -57,19 +68,35 @@ class BDI_Engine {
 
       // 3. FILTER: Choose the best intention.
       const newIntention = await this.filter(desires)
-      if (newIntention) {
+
+      // If there's an ongoing intention, check if we should switch
+      if (this.currentIntention && !this.currentIntention.isFinished()) {
+        if (newIntention && newIntention.isBetterThan(this.currentIntention)) {
+          const now = Date.now()
+          if (
+            now - this.lastIntentionSwitchTimestamp >
+            INTENTION_SWITCH_PENALTY_MS
+          ) {
+            log.info('Switching intention for a better one.')
+            this.currentIntention = newIntention
+            this.lastIntentionSwitchTimestamp = now
+          } else {
+            log.info('New intention is better, but switching is penalized.')
+          }
+        }
+      } else if (newIntention) {
         this.currentIntention = newIntention
-        log.info('New intention selected:', {
+        this.lastIntentionSwitchTimestamp = Date.now()
+      }
+
+      if (this.currentIntention) {
+        log.info('Current intention:', {
           type: this.currentIntention.desireType,
           goal: this.currentIntention.goal,
         })
+        this.execute(this.currentIntention)
       } else {
         this.currentIntention = null // No valid intention
-      }
-
-      // 4. EXECUTE: Act on the new intention.
-      if (this.currentIntention) {
-        this.execute(this.currentIntention)
       }
     }, config.agent.loopInterval)
   }
@@ -133,7 +160,7 @@ class BDI_Engine {
       )
 
       if (closestDeliveryZone) {
-        return new Intention(deliverDesire.type, closestDeliveryZone)
+        return new Intention(deliverDesire.type, closestDeliveryZone, Infinity) // Deliver has top priority
       }
     }
 
@@ -161,10 +188,14 @@ class BDI_Engine {
       }
 
       if (bestDesire) {
-        return new Intention(bestDesire.type, {
-          x: bestDesire.parcel!.x,
-          y: bestDesire.parcel!.y,
-        })
+        return new Intention(
+          bestDesire.type,
+          {
+            x: bestDesire.parcel!.x,
+            y: bestDesire.parcel!.y,
+          },
+          maxUtility,
+        )
       }
     }
 
@@ -184,7 +215,7 @@ class BDI_Engine {
         tiles![randomGoal.y][randomGoal.x].type === TileType.Delivery ||
         tiles![randomGoal.y][randomGoal.x].type === TileType.NonWalkable
       )
-      return new Intention(exploreDesire.type, randomGoal)
+      return new Intention(exploreDesire.type, randomGoal, -1) // Explore has low priority
     }
 
     return null
