@@ -31,28 +31,18 @@ export const calculateParcelUtility = async (
 ): Promise<number> => {
   const pickupPath = await pathfinder.findPath(
     grid,
-    { x: agent.x, y: agent.y },
-    { x: parcel.x, y: parcel.y },
+    { x: Math.round(agent.x), y: Math.round(agent.y) }, // starting point
+    { x: parcel.x, y: parcel.y }, // goal point
   )
 
   if (!pickupPath) {
     return -Infinity
   }
 
-  const timeToPickup = pickupPath.cost * config.MOVEMENT_DURATION
-
-  const numDecays = Math.floor(
-    timeToPickup /
-      parcelDecadingIntervalMapper[config.PARCEL_DECADING_INTERVAL],
-  )
-  const futureReward = parcel.reward - numDecays * 1 // @TODO: is it 1?
-
-  // e.g. if the parcel is already decayed
-  if (futureReward <= 0) {
-    return -Infinity
-  }
+  const timeToPickup = pickupPath.moves.length * config.MOVEMENT_DURATION
 
   let minTimeToDeliver = Infinity
+  let bestDeliveryZone: Point | null = null
 
   for (const deliveryZone of deliveryZones) {
     const timeToDeliverPath = await pathfinder.findPath(
@@ -64,6 +54,7 @@ export const calculateParcelUtility = async (
       const timeToDeliver = timeToDeliverPath.cost * config.MOVEMENT_DURATION
       if (timeToDeliver < minTimeToDeliver) {
         minTimeToDeliver = timeToDeliver
+        bestDeliveryZone = deliveryZone
       }
     }
   }
@@ -73,6 +64,17 @@ export const calculateParcelUtility = async (
   }
 
   const totalTimeCost = timeToPickup + minTimeToDeliver
+
+  const numDecays = Math.floor(
+    totalTimeCost /
+      parcelDecadingIntervalMapper[config.PARCEL_DECADING_INTERVAL],
+  )
+  const futureReward = parcel.reward - numDecays * 1 // @TODO: is it 1?
+
+  // e.g. if the parcel is already decayed
+  if (futureReward <= 0 || futureReward - numDecays <= 0) {
+    return -Infinity
+  }
 
   if (totalTimeCost === 0) {
     return Infinity
@@ -122,7 +124,6 @@ export const findClosestDeliveryZone = async (
  * @param density - The density of the grid.
  * @returns The generated grid.
  */
-
 export function printGrid(grid: Grid): void {
   let gridString = '┌' + '─'.repeat(grid.width * 2 + 1) + '┐\n'
 

@@ -123,7 +123,10 @@ class BDI_Engine {
     )
     if (deliverDesire && this.beliefSet.getDeliveryZones().length > 0) {
       const closestDeliveryZone = await findClosestDeliveryZone(
-        this.beliefSet.getMe() as Agent,
+        {
+          x: Math.round(this.beliefSet.getMe().x!),
+          y: Math.round(this.beliefSet.getMe().y!),
+        },
         this.beliefSet.getDeliveryZones(),
         this.beliefSet.getGrid() as Grid,
         this.pathfinder,
@@ -202,8 +205,11 @@ class BDI_Engine {
       return
     }
 
-    // Are we at the goal?
-    if (me.x === goal.x && me.y === goal.y) {
+    const isAtGoal = me.x! === goal.x && me.y! === goal.y
+    const isMoving = me.x !== Math.round(me.x!) || me.y !== Math.round(me.y!)
+
+    // Are we at the goal and not moving?
+    if (isAtGoal && !isMoving) {
       switch (intention.desireType) {
         case DesireType.GO_TO_AND_PICKUP:
           const pickedParcelsIds = await this.actionHandler.pickup()
@@ -226,11 +232,11 @@ class BDI_Engine {
           intention.setFinished() // Arrived at random spot
           break
       }
-    } else {
-      // Not at the goal, find a path and move.
+    } else if (!isMoving) {
+      // Not at the goal and not moving, find a path and move.
       const path = await this.pathfinder.findPath(
         this.beliefSet.getGrid() as Grid,
-        { x: me.x!, y: me.y! },
+        { x: Math.round(me.x!), y: Math.round(me.y!) },
         goal,
       )
       log.debug(
