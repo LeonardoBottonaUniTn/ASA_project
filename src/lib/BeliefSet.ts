@@ -110,7 +110,6 @@ class BeliefSet {
    */
   updateFromYou(data: Agent) {
     this.me = data
-    log.info('Agent state updated:', this.me)
   }
 
   /**
@@ -177,23 +176,6 @@ class BeliefSet {
   // Utility methods can be added here, e.g.,
   getParcel(id: string): Parcel | undefined {
     return this.parcels.get(id)
-  }
-
-  getClosestParcel(position: Point): Parcel | null {
-    let closestParcel: Parcel | null = null
-    let minDistance = Infinity
-
-    for (const parcel of this.parcels.values()) {
-      if (!parcel.carriedBy) {
-        const distance =
-          Math.abs(position.x - parcel.x) + Math.abs(position.y - parcel.y)
-        if (distance < minDistance) {
-          minDistance = distance
-          closestParcel = parcel
-        }
-      }
-    }
-    return closestParcel
   }
 }
 
