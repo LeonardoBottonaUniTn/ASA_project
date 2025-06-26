@@ -7,6 +7,7 @@ export class Intention {
   public goal: Point | null
   public finished: boolean
   public utility: number
+  private executing: boolean = false
 
   /**
    * @param {DesireType} desire - The underlying desire.
@@ -45,5 +46,19 @@ export class Intention {
    */
   isBetterThan(other: Intention): boolean {
     return this.utility > other.utility
+  }
+
+  /**
+   * Checks if the intention is currently being executed.
+   */
+  isExecuting(): boolean {
+    return this.executing
+  }
+
+  /**
+   * Sets the execution status of the intention.
+   */
+  setExecuting(status: boolean) {
+    this.executing = status
   }
 }

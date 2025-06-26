@@ -19,8 +19,6 @@ import {
 
 const log = Logger('BDI_Engine')
 
-const INTENTION_SWITCH_PENALTY_MS = 200 // 5 seconds penalty
-
 class BDI_Engine {
   private beliefSet: BeliefSet
   private pathfinder: Pathfinder
@@ -72,17 +70,8 @@ class BDI_Engine {
       // If there's an ongoing intention, check if we should switch
       if (this.currentIntention && !this.currentIntention.isFinished()) {
         if (newIntention && newIntention.isBetterThan(this.currentIntention)) {
-          const now = Date.now()
-          if (
-            now - this.lastIntentionSwitchTimestamp >
-            INTENTION_SWITCH_PENALTY_MS
-          ) {
-            log.info('Switching intention for a better one.')
-            this.currentIntention = newIntention
-            this.lastIntentionSwitchTimestamp = now
-          } else {
-            log.info('New intention is better, but switching is penalized.')
-          }
+          log.info('Switching intention for a better one.')
+          this.currentIntention = newIntention
         }
       } else if (newIntention) {
         this.currentIntention = newIntention
@@ -94,7 +83,14 @@ class BDI_Engine {
           type: this.currentIntention.desireType,
           goal: this.currentIntention.goal,
         })
-        this.execute(this.currentIntention)
+        // Only execute if not already executing and not finished
+        if (
+          !this.currentIntention.isExecuting() &&
+          !this.currentIntention.isFinished()
+        ) {
+          this.currentIntention.setExecuting(true)
+          this.execute(this.currentIntention)
+        }
       } else {
         this.currentIntention = null // No valid intention
       }
@@ -226,67 +222,71 @@ class BDI_Engine {
    * @param {Intention} intention
    */
   async execute(intention: Intention) {
-    if (intention.isFinished()) {
-      this.currentIntention = null
-      return
-    }
-
-    const me = this.beliefSet.getMe()
-    const goal = intention.goal
-
-    if (!goal) {
-      intention.setFinished()
-      return
-    }
-
-    const isAtGoal = me.x! === goal.x && me.y! === goal.y
-    const isMoving = me.x !== Math.round(me.x!) || me.y !== Math.round(me.y!)
-
-    // Are we at the goal and not moving?
-    if (isAtGoal && !isMoving) {
-      switch (intention.desireType) {
-        case DesireType.GO_TO_AND_PICKUP:
-          const pickedParcelsIds = await this.actionHandler.pickup()
-          if (pickedParcelsIds.length > 0) {
-            const pickedParcelId = pickedParcelsIds[0].id
-            const pickedParcel = this.beliefSet.getParcel(pickedParcelId)
-            if (pickedParcel) {
-              this.beliefSet.setCarrying(pickedParcel)
-            }
-          }
-          intention.setFinished()
-          break
-        case DesireType.DELIVER_CARRIED_PARCELS:
-          await this.actionHandler.drop()
-          this.beliefSet.setCarrying(null)
-          intention.setFinished()
-          break
-        case DesireType.EXPLORE_RANDOMLY:
-          intention.setFinished() // Arrived at random spot
-          break
+    try {
+      if (intention.isFinished()) {
+        this.currentIntention = null
+        return
       }
-    } else if (!isMoving) {
-      // Not at the goal and not moving, find a path and move.
-      const path = await this.pathfinder.findPath(
-        this.beliefSet.getGrid() as Grid,
-        { x: Math.round(me.x!), y: Math.round(me.y!) },
-        goal,
-      )
 
-      if (path && path.moves.length > 0) {
-        const nextMove = path.moves[0]
-        await this.actionHandler.move(nextMove)
-      } else {
-        log.warn(
-          'No path to goal, or already there. Intention might be stuck.',
-          {
-            goal: intention.goal,
-            current: { x: me.x, y: me.y },
-          },
-        )
-        // If stuck, invalidate the intention to allow for replanning
+      const me = this.beliefSet.getMe()
+      const goal = intention.goal
+
+      if (!goal) {
         intention.setFinished()
+        return
       }
+
+      const isAtGoal = me.x! === goal.x && me.y! === goal.y
+      const isMoving = me.x !== Math.round(me.x!) || me.y !== Math.round(me.y!)
+
+      // Are we at the goal and not moving?
+      if (isAtGoal && !isMoving) {
+        switch (intention.desireType) {
+          case DesireType.GO_TO_AND_PICKUP:
+            const pickedParcelsIds = await this.actionHandler.pickup()
+            if (pickedParcelsIds.length > 0) {
+              const pickedParcelId = pickedParcelsIds[0].id
+              const pickedParcel = this.beliefSet.getParcel(pickedParcelId)
+              if (pickedParcel) {
+                this.beliefSet.setCarrying(pickedParcel)
+              }
+            }
+            intention.setFinished()
+            break
+          case DesireType.DELIVER_CARRIED_PARCELS:
+            await this.actionHandler.drop()
+            this.beliefSet.setCarrying(null)
+            intention.setFinished()
+            break
+          case DesireType.EXPLORE_RANDOMLY:
+            intention.setFinished() // Arrived at random spot
+            break
+        }
+      } else if (!isMoving) {
+        // Not at the goal and not moving, find a path and move.
+        const path = await this.pathfinder.findPath(
+          this.beliefSet.getGrid() as Grid,
+          { x: Math.round(me.x!), y: Math.round(me.y!) },
+          goal,
+        )
+
+        if (path && path.moves.length > 0) {
+          const nextMove = path.moves[0]
+          await this.actionHandler.move(nextMove)
+        } else {
+          log.warn(
+            'No path to goal, or already there. Intention might be stuck.',
+            {
+              goal: intention.goal,
+              current: { x: me.x, y: me.y },
+            },
+          )
+          // If stuck, invalidate the intention to allow for replanning
+          intention.setFinished()
+        }
+      }
+    } finally {
+      intention.setExecuting(false)
     }
   }
 }
