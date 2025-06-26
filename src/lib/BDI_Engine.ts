@@ -1,11 +1,21 @@
 import { Intention } from './Intention.js'
 import config from '../config.js'
 import Logger from '../utils/Logger.js'
-import { DesireType, Grid, TileType } from '../types/index.js'
+import {
+  Agent,
+  DesireType,
+  GameConfig,
+  Grid,
+  TileType,
+} from '../types/index.js'
 import BeliefSet from './BeliefSet.js'
 import Pathfinder from './Pathfinder.js'
 import ActionHandler from './ActionHandler.js'
 import { Desire } from '../types/index.js'
+import {
+  calculateParcelUtility,
+  findClosestDeliveryZone,
+} from '../utils/utils.js'
 
 const log = Logger('BDI_Engine')
 
@@ -29,7 +39,7 @@ class BDI_Engine {
    * The main agent loop.
    */
   run() {
-    setInterval(() => {
+    setInterval(async () => {
       // If there's an ongoing intention, let it finish
       if (this.currentIntention && !this.currentIntention.isFinished()) {
         this.execute(this.currentIntention)
@@ -46,7 +56,7 @@ class BDI_Engine {
       )
 
       // 3. FILTER: Choose the best intention.
-      const newIntention = this.filter(desires)
+      const newIntention = await this.filter(desires)
       if (newIntention) {
         this.currentIntention = newIntention
         log.info('New intention selected:', {
@@ -97,9 +107,9 @@ class BDI_Engine {
   /**
    * Filters desires to select the most pressing intention.
    * @param {Desire[]} desires
-   * @returns {Intention | null}
+   * @returns {Promise<Intention | null>}
    */
-  filter(desires: Desire[]): Intention | null {
+  async filter(desires: Desire[]): Promise<Intention | null> {
     if (
       desires.length === 0 ||
       this.beliefSet.getMe().x === undefined ||
@@ -112,35 +122,47 @@ class BDI_Engine {
       (d) => d.type === DesireType.DELIVER_CARRIED_PARCELS,
     )
     if (deliverDesire && this.beliefSet.getDeliveryZones().length > 0) {
-      // Assume one delivery zone for now..
-      // @TODO: get closest delivery zone or the one which
-      // maximizes the reward considering nearby parcels and expiration times of
-      // those I already picked up
-      const deliveryZone = this.beliefSet.getDeliveryZones()[0]
+      const closestDeliveryZone = await findClosestDeliveryZone(
+        this.beliefSet.getMe() as Agent,
+        this.beliefSet.getDeliveryZones(),
+        this.beliefSet.getGrid() as Grid,
+        this.pathfinder,
+      )
 
-      return new Intention(deliverDesire.type, deliveryZone)
+      if (closestDeliveryZone) {
+        return new Intention(deliverDesire.type, closestDeliveryZone)
+      }
     }
 
     const pickupDesires = desires.filter(
       (d) => d.type === DesireType.GO_TO_AND_PICKUP,
     )
     if (pickupDesires.length > 0) {
-      // Find the closest parcel to pick up
-      let closestDesire: Desire | null = null
-      let minDistance = Infinity
+      // Find the parcel with the highest utility score to pick up
+      let bestDesire: Desire | null = null
+      let maxUtility = -Infinity
+
       for (const desire of pickupDesires) {
-        const distance =
-          Math.abs(this.beliefSet.getMe().x! - desire.parcel!.x) +
-          Math.abs(this.beliefSet.getMe().y! - desire.parcel!.y)
-        if (distance < minDistance) {
-          minDistance = distance
-          closestDesire = desire
+        const utility = await calculateParcelUtility(
+          desire.parcel!,
+          this.beliefSet.getMe() as Agent,
+          this.beliefSet.getGrid() as Grid,
+          this.beliefSet.getConfig() as GameConfig,
+          this.beliefSet.getDeliveryZones(),
+          this.pathfinder,
+        )
+        if (utility > maxUtility) {
+          maxUtility = utility
+          bestDesire = desire
         }
       }
-      return new Intention(closestDesire!.type, {
-        x: closestDesire!.parcel!.x,
-        y: closestDesire!.parcel!.y,
-      })
+
+      if (bestDesire) {
+        return new Intention(bestDesire.type, {
+          x: bestDesire.parcel!.x,
+          y: bestDesire.parcel!.y,
+        })
+      }
     }
 
     const exploreDesire = desires.find(
