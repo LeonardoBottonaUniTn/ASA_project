@@ -1,21 +1,12 @@
 import { Intention } from './Intention.js'
 import config from '../config.js'
 import Logger from '../utils/Logger.js'
-import {
-  Agent,
-  DesireType,
-  GameConfig,
-  Grid,
-  TileType,
-} from '../types/index.js'
+import { DesireType, Grid, Tour, TourStopType } from '../types/index.js'
 import BeliefSet from './BeliefSet.js'
 import Pathfinder from './Pathfinder.js'
 import ActionHandler from './ActionHandler.js'
 import { Desire } from '../types/index.js'
-import {
-  calculateParcelUtility,
-  findClosestDeliveryZone,
-} from '../utils/utils.js'
+import { TourPlanner } from './TourPlanner.js'
 
 const log = Logger('BDI_Engine')
 
@@ -23,8 +14,8 @@ class BDI_Engine {
   private beliefSet: BeliefSet
   private pathfinder: Pathfinder
   private actionHandler: ActionHandler
+  private tourPlanner: TourPlanner
   private currentIntention: Intention | null = null
-  private lastIntentionSwitchTimestamp = 0
 
   constructor(
     beliefSet: BeliefSet,
@@ -34,6 +25,7 @@ class BDI_Engine {
     this.beliefSet = beliefSet
     this.pathfinder = pathfinder
     this.actionHandler = actionHandler
+    this.tourPlanner = new TourPlanner(pathfinder, beliefSet)
   }
 
   /**
@@ -59,10 +51,6 @@ class BDI_Engine {
 
       // 2. DELIBERATE: Generate desires.
       const desires = this.deliberate()
-      log.debug(
-        'Generated desires:',
-        desires.map((d) => d.type),
-      )
 
       // 3. FILTER: Choose the best intention.
       const newIntention = await this.filter(desires)
@@ -71,24 +59,16 @@ class BDI_Engine {
       if (this.currentIntention && !this.currentIntention.isFinished()) {
         if (newIntention && newIntention.isBetterThan(this.currentIntention)) {
           log.info('Switching intention for a better one.')
+          this.currentIntention.setFinished() // Stop the current execution
+          this.currentIntention.setExecuting(false) // Reset executing state
           this.currentIntention = newIntention
         }
       } else if (newIntention) {
         this.currentIntention = newIntention
-        this.lastIntentionSwitchTimestamp = Date.now()
       }
 
-      if (this.currentIntention) {
-        log.info('Current intention:', {
-          type: this.currentIntention.desireType,
-          goal: this.currentIntention.goal,
-        })
-        // Only execute if not already executing and not finished
-        if (
-          !this.currentIntention.isExecuting() &&
-          !this.currentIntention.isFinished()
-        ) {
-          this.currentIntention.setExecuting(true)
+      if (this.currentIntention && !this.currentIntention.isFinished()) {
+        if (!this.currentIntention.isExecuting()) {
           this.execute(this.currentIntention)
         }
       } else {
@@ -104,19 +84,9 @@ class BDI_Engine {
   deliberate(): Desire[] {
     const desires: Desire[] = []
 
-    if (this.beliefSet.getCarrying()) {
-      // Desire: Deliver the parcel we are carrying.
-      desires.push({
-        type: DesireType.DELIVER_CARRIED_PARCELS,
-        parcel: this.beliefSet.getCarrying()!,
-      })
-    } else {
-      // Desire: Go to and pick up any available parcel.
-      for (const parcel of this.beliefSet.getParcels().values()) {
-        if (!parcel.carriedBy) {
-          desires.push({ type: DesireType.GO_TO_AND_PICKUP, parcel })
-        }
-      }
+    // Desire to plan a tour if there are parcels available
+    if (this.beliefSet.getParcels().size > 0) {
+      desires.push({ type: DesireType.PLAN_TOUR })
     }
 
     // If no other desires, explore.
@@ -137,154 +107,122 @@ class BDI_Engine {
       desires.length === 0 ||
       this.beliefSet.getMe().x === undefined ||
       this.beliefSet.getMe().y === undefined
-    )
+    ) {
       return null
-
-    // Priority: Deliver > Pickup > Explore
-    const deliverDesire = desires.find(
-      (d) => d.type === DesireType.DELIVER_CARRIED_PARCELS,
-    )
-    if (deliverDesire && this.beliefSet.getDeliveryZones().length > 0) {
-      const closestDeliveryZone = await findClosestDeliveryZone(
-        {
-          x: Math.round(this.beliefSet.getMe().x!),
-          y: Math.round(this.beliefSet.getMe().y!),
-        },
-        this.beliefSet.getDeliveryZones(),
-        this.beliefSet.getGrid() as Grid,
-        this.pathfinder,
-      )
-
-      if (closestDeliveryZone) {
-        return new Intention(deliverDesire.type, closestDeliveryZone, Infinity) // Deliver has top priority
-      }
     }
 
-    const pickupDesires = desires.filter(
-      (d) => d.type === DesireType.GO_TO_AND_PICKUP,
-    )
-    if (pickupDesires.length > 0) {
-      // Find the parcel with the highest utility score to pick up
-      let bestDesire: Desire | null = null
-      let maxUtility = -Infinity
+    const planTourDesire = desires.find((d) => d.type === DesireType.PLAN_TOUR)
 
-      for (const desire of pickupDesires) {
-        const utility = await calculateParcelUtility(
-          desire.parcel!,
-          this.beliefSet.getMe() as Agent,
-          this.beliefSet.getGrid() as Grid,
-          this.beliefSet.getConfig() as GameConfig,
-          this.beliefSet.getDeliveryZones(),
-          this.pathfinder,
+    if (planTourDesire) {
+      const parcels = Array.from(this.beliefSet.getParcels().values())
+      let tour: Tour | null = null
+
+      // If we have a current tour, try to improve it
+      if (this.currentIntention?.tour) {
+        const unusedParcels = parcels.filter(
+          // Avoid considering parcels already in the tour
+          (parcel) =>
+            !this.currentIntention!.tour!.stops.some(
+              (stop) =>
+                stop.type === TourStopType.PICKUP &&
+                stop.parcel?.id === parcel.id,
+            ),
         )
-        if (utility > maxUtility) {
-          maxUtility = utility
-          bestDesire = desire
+
+        if (unusedParcels.length > 0) {
+          let bestImprovedTour = this.currentIntention.tour
+
+          // Try inserting each unused parcel and keep track of the best tour
+          for (const parcel of unusedParcels) {
+            const improvedTour = await this.tourPlanner.insertParcel(
+              this.currentIntention.tour,
+              parcel,
+            )
+
+            if (improvedTour.utility > bestImprovedTour.utility) {
+              bestImprovedTour = improvedTour
+            }
+          }
+
+          // If we found a better tour, use it
+          if (bestImprovedTour.utility > this.currentIntention.tour.utility) {
+            tour = bestImprovedTour
+          }
         }
+      } else {
+        // Create a new tour
+        tour = await this.tourPlanner.createTour()
       }
 
-      if (bestDesire) {
-        return new Intention(
-          bestDesire.type,
-          {
-            x: bestDesire.parcel!.x,
-            y: bestDesire.parcel!.y,
-          },
-          maxUtility,
-        )
+      if (tour && tour.stops.length > 0) {
+        return new Intention(DesireType.PLAN_TOUR, tour)
       }
     }
 
     const exploreDesire = desires.find(
       (d) => d.type === DesireType.EXPLORE_RANDOMLY,
     )
+
     if (exploreDesire) {
-      // Pick a random tile to explore
-      const { width, height, tiles } = this.beliefSet.getGrid()
-      let randomGoal
-      do {
-        randomGoal = {
-          x: Math.floor(Math.random() * width!),
-          y: Math.floor(Math.random() * height!),
-        }
-      } while (
-        tiles![randomGoal.y][randomGoal.x].type === TileType.Delivery ||
-        tiles![randomGoal.y][randomGoal.x].type === TileType.NonWalkable
-      )
-      return new Intention(exploreDesire.type, randomGoal, -1) // Explore has low priority
+      return new Intention(exploreDesire.type, null)
     }
 
     return null
   }
 
-  /**
-   * Executes the current intention.
-   * @param {Intention} intention
-   */
   async execute(intention: Intention) {
+    if (intention.isFinished()) {
+      return
+    }
+
+    intention.setExecuting(true)
+    log.info(`Executing intention: ${intention.desireType}`)
+
     try {
-      if (intention.isFinished()) {
-        this.currentIntention = null
-        return
-      }
-
-      const me = this.beliefSet.getMe()
-      const goal = intention.goal
-
-      if (!goal) {
-        intention.setFinished()
-        return
-      }
-
-      const isAtGoal = me.x! === goal.x && me.y! === goal.y
-      const isMoving = me.x !== Math.round(me.x!) || me.y !== Math.round(me.y!)
-
-      // Are we at the goal and not moving?
-      if (isAtGoal && !isMoving) {
-        switch (intention.desireType) {
-          case DesireType.GO_TO_AND_PICKUP:
-            const pickedParcelsIds = await this.actionHandler.pickup()
-            if (pickedParcelsIds.length > 0) {
-              const pickedParcelId = pickedParcelsIds[0].id
-              const pickedParcel = this.beliefSet.getParcel(pickedParcelId)
-              if (pickedParcel) {
-                this.beliefSet.setCarrying(pickedParcel)
-              }
-            }
-            intention.setFinished()
-            break
-          case DesireType.DELIVER_CARRIED_PARCELS:
-            await this.actionHandler.drop()
-            this.beliefSet.setCarrying(null)
-            intention.setFinished()
-            break
-          case DesireType.EXPLORE_RANDOMLY:
-            intention.setFinished() // Arrived at random spot
-            break
+      for (const stop of intention.tour?.stops || []) {
+        // Check if the intention was marked as finished (by a better intention)...
+        if (intention.isFinished()) {
+          log.info('Stopping execution as a better intention was found')
+          return
         }
-      } else if (!isMoving) {
-        // Not at the goal and not moving, find a path and move.
+
         const path = await this.pathfinder.findPath(
           this.beliefSet.getGrid() as Grid,
-          { x: Math.round(me.x!), y: Math.round(me.y!) },
-          goal,
+          {
+            x: Math.round(this.beliefSet.getMe().x!),
+            y: Math.round(this.beliefSet.getMe().y!),
+          },
+          stop.position,
         )
 
-        if (path && path.moves.length > 0) {
-          const nextMove = path.moves[0]
-          await this.actionHandler.move(nextMove)
-        } else {
-          log.warn(
-            'No path to goal, or already there. Intention might be stuck.',
-            {
-              goal: intention.goal,
-              current: { x: me.x, y: me.y },
-            },
-          )
-          // If stuck, invalidate the intention to allow for replanning
-          intention.setFinished()
+        for (const move of path?.moves || []) {
+          // ... check again before each move
+          if (intention.isFinished()) {
+            log.info('Stopping execution as a better intention was found')
+            return
+          }
+          await this.actionHandler.move(move)
+        }
+
+        // ... and before any action
+        if (intention.isFinished()) {
+          log.info('Stopping execution as a better intention was found')
+          return
+        }
+
+        switch (stop.type) {
+          case 'PICKUP':
+            await this.actionHandler.pickup()
+            break
+          case 'DELIVERY':
+            await this.actionHandler.drop()
+            break
         }
       }
+      intention.setFinished()
+    } catch (error) {
+      log.error('Error executing intention:', error)
+      intention.setFinished() // Mark as finished to avoid retries
     } finally {
       intention.setExecuting(false)
     }
