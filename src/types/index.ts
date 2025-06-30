@@ -41,14 +41,28 @@ export interface Point {
  * @enum {string}
  */
 export enum DesireType {
-  GO_TO_AND_PICKUP = 'GO_TO_AND_PICKUP',
-  DELIVER_CARRIED_PARCELS = 'DELIVER_CARRIED_PARCELS',
   EXPLORE_RANDOMLY = 'EXPLORE_RANDOMLY',
+  PLAN_TOUR = 'PLAN_TOUR',
 }
 
 export interface Desire {
   type: DesireType
+}
+
+export enum TourStopType {
+  PICKUP = 'PICKUP',
+  DELIVERY = 'DELIVERY',
+}
+
+export interface TourStop {
+  type: TourStopType
   parcel?: Parcel
+  position: Point
+}
+
+export interface Tour {
+  stops: TourStop[]
+  utility: number
 }
 
 export enum Move {
