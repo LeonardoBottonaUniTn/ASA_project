@@ -12,7 +12,11 @@ import Pathfinder from '../lib/Pathfinder.js'
 const log = Logger('Utils')
 
 /**
- * Calculates the utility of a parcel.
+ * Calculates the utility of a parcel. The utility is computed as the future reward divided by the total time cost.
+ * The future reward is the reward of the parcel minus the number of decays multiplied by the average reward.
+ * The total time cost is the time to pickup the parcel plus the time to deliver the parcel.
+ * The time to pickup the parcel is the number of moves multiplied by the movement duration.
+ *
  * @param parcel The parcel to calculate the utility for.
  * @param agent The agent that is calculating the utility.
  * @param grid The grid of the environment.
@@ -21,14 +25,14 @@ const log = Logger('Utils')
  * @param pathfinder The pathfinder to use for calculating the path.
  * @returns The utility of the parcel.
  */
-export const calculateParcelUtility = async (
+export async function calculateParcelUtility(
   parcel: Parcel,
   agent: Agent,
   grid: Grid,
   config: GameConfig,
   deliveryZones: Point[],
   pathfinder: Pathfinder,
-): Promise<number> => {
+): Promise<number> {
   const pickupPath = await pathfinder.findPath(
     grid,
     { x: Math.round(agent.x), y: Math.round(agent.y) }, // starting point
@@ -42,7 +46,6 @@ export const calculateParcelUtility = async (
   const timeToPickup = pickupPath.moves.length * config.MOVEMENT_DURATION
 
   let minTimeToDeliver = Infinity
-  let bestDeliveryZone: Point | null = null
 
   for (const deliveryZone of deliveryZones) {
     const timeToDeliverPath = await pathfinder.findPath(
@@ -54,7 +57,6 @@ export const calculateParcelUtility = async (
       const timeToDeliver = timeToDeliverPath.cost * config.MOVEMENT_DURATION
       if (timeToDeliver < minTimeToDeliver) {
         minTimeToDeliver = timeToDeliver
-        bestDeliveryZone = deliveryZone
       }
     }
   }
@@ -69,7 +71,8 @@ export const calculateParcelUtility = async (
     totalTimeCost /
       parcelDecadingIntervalMapper[config.PARCEL_DECADING_INTERVAL],
   )
-  const futureReward = parcel.reward - numDecays * 1 // @TODO: is it 1?
+  const futureReward =
+    parcel.reward - numDecays * (config.PARCEL_REWARD_AVG / 10)
 
   // e.g. if the parcel is already decayed
   if (futureReward <= 0 || futureReward - numDecays <= 0) {
@@ -89,18 +92,18 @@ export const calculateParcelUtility = async (
  * @param deliveryZones The delivery zones of the environment.
  * @param grid The grid of the environment.
  * @param pathfinder The pathfinder to use for calculating the path.
- * @returns The closest delivery zone.
+ * @returns The closest delivery zone to the given point.
  *
  * @todo it might be a better solution to pre-compute a map of the closest
  * delivery zone to each tile in the map such that to avoid useless re-computations
  * during the game.
  */
-export const findClosestDeliveryZone = async (
+export async function findClosestDeliveryZone(
   point: Point,
   deliveryZones: Point[],
   grid: Grid,
   pathfinder: Pathfinder,
-): Promise<Point | null> => {
+): Promise<Point> {
   let closestDeliveryZone: Point | null = null
   let minDistance = Infinity
 
@@ -114,7 +117,7 @@ export const findClosestDeliveryZone = async (
     }
   }
 
-  return closestDeliveryZone
+  return closestDeliveryZone || deliveryZones[0]
 }
 
 /**
@@ -157,7 +160,7 @@ export function printGrid(grid: Grid): void {
  * Mapper for parcel decading interval (game config. property).
  * Maps interval string to milliseconds.
  */
-const parcelDecadingIntervalMapper: Record<string, number> = {
+export const parcelDecadingIntervalMapper: Record<string, number> = {
   '1s': 1000,
   '2s': 2000,
   '5s': 5000,
