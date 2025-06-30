@@ -13,7 +13,7 @@ const log = Logger('BeliefSet')
 
 class BeliefSet {
   private me: Partial<Agent> = {}
-  private carrying: Parcel | null = null
+  private carrying: Parcel[] = []
   private grid: Partial<Grid> = {}
   private parcels: Map<string, Parcel> = new Map()
   private deliveryZones: Point[] = []
@@ -41,19 +41,11 @@ class BeliefSet {
   }
 
   /**
-   * Returns the current agent's carrying state.
-   * @returns {Parcel | null}
+   * Returns the current agent's carrying parcela.
+   * @returns {Parcel[]}
    */
-  getCarrying(): Parcel | null {
+  getCarryingParcels(): Parcel[] {
     return this.carrying
-  }
-
-  /**
-   * Updates the agent's carrying state.
-   * @param {Parcel | null} parcel - The parcel being carried or null if not carrying.
-   */
-  setCarrying(parcel: Parcel | null) {
-    this.carrying = parcel
   }
 
   /**
