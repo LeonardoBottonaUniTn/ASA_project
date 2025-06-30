@@ -1,24 +1,21 @@
-import { DesireType, Point } from '../types/index.js'
+import { DesireType, Tour } from '../types/index.js'
 import Logger from '../utils/Logger.js'
 const log = Logger('Intention')
 
 export class Intention {
   public desireType: DesireType
-  public goal: Point | null
+  public tour: Tour | null
   public finished: boolean
-  public utility: number
   private executing: boolean = false
 
   /**
    * @param {DesireType} desire - The underlying desire.
-   * @param {Point} goal - The target coordinates {x, y}.
-   * @param {number} utility - The utility of the intention.
+   * @param {Tour} tour - The tour plan.
    */
-  constructor(desireType: DesireType, goal: Point | null, utility = 0) {
+  constructor(desireType: DesireType, tour: Tour | null) {
     this.desireType = desireType
-    this.goal = goal
+    this.tour = tour
     this.finished = false
-    this.utility = utility
   }
 
   /**
@@ -45,7 +42,9 @@ export class Intention {
    * @returns {boolean}
    */
   isBetterThan(other: Intention): boolean {
-    return this.utility > other.utility
+    if (!this.tour) return false
+    if (!other.tour) return true
+    return this.tour.utility > other.tour.utility
   }
 
   /**
