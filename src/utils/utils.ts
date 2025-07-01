@@ -25,15 +25,15 @@ const log = Logger('Utils')
  * @param pathfinder The pathfinder to use for calculating the path.
  * @returns The utility of the parcel.
  */
-export async function calculateParcelUtility(
+export function calculateParcelUtility(
   parcel: Parcel,
   agent: Agent,
   grid: Grid,
   config: GameConfig,
   deliveryZones: Point[],
   pathfinder: Pathfinder,
-): Promise<number> {
-  const pickupPath = await pathfinder.findPath(
+): number {
+  const pickupPath = pathfinder.findPath(
     grid,
     { x: Math.round(agent.x), y: Math.round(agent.y) }, // starting point
     { x: parcel.x, y: parcel.y }, // goal point
@@ -48,7 +48,7 @@ export async function calculateParcelUtility(
   let minTimeToDeliver = Infinity
 
   for (const deliveryZone of deliveryZones) {
-    const timeToDeliverPath = await pathfinder.findPath(
+    const timeToDeliverPath = pathfinder.findPath(
       grid,
       { x: parcel.x, y: parcel.y },
       deliveryZone,
@@ -71,8 +71,7 @@ export async function calculateParcelUtility(
     totalTimeCost /
       parcelDecadingIntervalMapper[config.PARCEL_DECADING_INTERVAL],
   )
-  const futureReward =
-    parcel.reward - numDecays * (config.PARCEL_REWARD_AVG / 10)
+  const futureReward = parcel.reward - numDecays
 
   // e.g. if the parcel is already decayed
   if (futureReward <= 0 || futureReward - numDecays <= 0) {
@@ -98,17 +97,17 @@ export async function calculateParcelUtility(
  * delivery zone to each tile in the map such that to avoid useless re-computations
  * during the game.
  */
-export async function findClosestDeliveryZone(
+export function findClosestDeliveryZone(
   point: Point,
   deliveryZones: Point[],
   grid: Grid,
   pathfinder: Pathfinder,
-): Promise<Point> {
+): Point {
   let closestDeliveryZone: Point | null = null
   let minDistance = Infinity
 
   for (const deliveryZone of deliveryZones) {
-    const path = await pathfinder.findPath(grid, point, deliveryZone)
+    const path = pathfinder.findPath(grid, point, deliveryZone)
     if (path) {
       if (path.cost < minDistance) {
         minDistance = path.cost
@@ -157,6 +156,22 @@ export function printGrid(grid: Grid): void {
 }
 
 /**
+ * Returns a random walkable tile from the grid.
+ *
+ * @returns {Point} A random walkable tile.
+ */
+export const getRandomWalkableTile = (grid: Grid): Point => {
+  while (true) {
+    const x = Math.floor(Math.random() * grid.width)
+    const y = Math.floor(Math.random() * grid.height)
+
+    if (grid.tiles[y][x].type === TileType.Walkable) {
+      return { x, y }
+    }
+  }
+}
+
+/**
  * Mapper for parcel decading interval (game config. property).
  * Maps interval string to milliseconds.
  */
@@ -167,3 +182,27 @@ export const parcelDecadingIntervalMapper: Record<string, number> = {
   '10s': 10000,
   infinite: Infinity,
 } as const
+
+/**
+ * Parses time interval strings like "10s", "1000ms" into milliseconds
+ */
+export const parseTimeInterval = (interval: string) => {
+  const match = interval.match(/^(\d+)(ms|s|m|h)?$/)
+  if (!match) return 0
+
+  const value = parseInt(match[1])
+  const unit = match[2] || 'ms'
+
+  switch (unit) {
+    case 'ms':
+      return value
+    case 's':
+      return value * 1000
+    case 'm':
+      return value * 60 * 1000
+    case 'h':
+      return value * 60 * 60 * 1000
+    default:
+      return 0
+  }
+}
