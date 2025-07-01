@@ -14,6 +14,13 @@ export interface Parcel {
   carriedBy?: string
 }
 
+// Extended Parcel interface to include outdated status
+export interface ExtendedParcel extends Parcel {
+  outdated?: boolean
+  lastSeenTimestamp?: number
+  lastSeenReward?: number
+}
+
 export enum TileType {
   NonWalkable = 0,
   Walkable = 1,
@@ -58,6 +65,7 @@ export interface TourStop {
   type: TourStopType
   parcel?: Parcel
   position: Point
+  utility?: number // used for delivery stops onlu
 }
 
 export interface Tour {
