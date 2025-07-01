@@ -17,7 +17,7 @@ class ActionHandler {
   async move(
     direction: 'up' | 'down' | 'left' | 'right' | { x: number; y: number },
   ): Promise<{ x: number; y: number } | false> {
-    return this.api.emitMove(direction)
+    return await this.api.emitMove(direction)
   }
 
   /**
@@ -25,7 +25,7 @@ class ActionHandler {
    * @returns {Promise<{id: string}[]>}
    */
   async pickup(): Promise<{ id: string }[]> {
-    return this.api.emitPickup()
+    return await this.api.emitPickup()
   }
 
   /**
@@ -33,7 +33,7 @@ class ActionHandler {
    * @returns {Promise<{id: string}[]>}
    */
   async drop(): Promise<{ id: string }[]> {
-    return this.api.emitPutdown()
+    return await this.api.emitPutdown()
   }
 }
 
