@@ -32,7 +32,6 @@ export class Intention {
   setFinished() {
     if (!this.finished) {
       this.finished = true
-      log.info(`Intention finished: ${this.desireType}`)
     }
   }
 
