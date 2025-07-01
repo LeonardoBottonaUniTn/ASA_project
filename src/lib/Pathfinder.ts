@@ -88,12 +88,12 @@ class Pathfinder {
     return p1.x === p2.x && p1.y === p2.y
   }
 
-  async findPath(
+  findPath(
     grid: Grid,
     start: Point,
     goal: Point,
     heuristic: Heuristic = manhattanDistance,
-  ): Promise<Path | null> {
+  ): Path | null {
     if (!grid.tiles || !start || !goal) {
       log.warn(
         'findPath called with incomplete information (grid, start, or goal missing).',
