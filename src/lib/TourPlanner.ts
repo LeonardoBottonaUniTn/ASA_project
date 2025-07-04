@@ -4,6 +4,7 @@ import Logger from '../utils/Logger.js'
 import {
   findClosestDeliveryZone,
   parcelDecadingIntervalMapper,
+  calculateParcelThreat,
 } from '../utils/utils.js'
 import BeliefSet from './BeliefSet.js'
 
@@ -185,6 +186,8 @@ export class TourPlanner {
    * both high rewards and efficient delivery times.
    *
    * @param tour - The tour to evaluate
+   *
+   *
    * @returns The calculated utility value, or -Infinity if no valid path exists
    */
   private calculateTourUtility(tour: Tour): number {
@@ -230,7 +233,20 @@ export class TourPlanner {
 
         // Apply decay to each parcel in inventory
         for (const item of simulatedInventory) {
-          item.reward -= decayPerParcelThisLeg
+          //calculate the threat level for the parcel
+          const threatLevel = calculateParcelThreat(
+            item.parcel,
+            this.beliefSet,
+            this.pathfinder,
+            this.beliefSet.getGrid() as Grid,
+          )
+          /* log.info(
+            `Threat level for parcel ${item.parcel.id}: ${threatLevel} on total reward ${item.reward}`,
+          ) */
+          item.reward -= decayPerParcelThisLeg + threatLevel // Apply decay and threat level
+          if (item.reward < 0) {
+            item.reward = 0 // Ensure reward doesn't go negative
+          }
         }
       }
 

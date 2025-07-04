@@ -8,82 +8,10 @@ import {
 } from '../types/index.js'
 import Logger from '../utils/Logger.js'
 import Pathfinder from '../lib/Pathfinder.js'
+import BeliefSet from '../lib/BeliefSet.js'
+import path from 'path'
 
 const log = Logger('Utils')
-
-/**
- * Calculates the utility of a parcel. The utility is computed as the future reward divided by the total time cost.
- * The future reward is the reward of the parcel minus the number of decays multiplied by the average reward.
- * The total time cost is the time to pickup the parcel plus the time to deliver the parcel.
- * The time to pickup the parcel is the number of moves multiplied by the movement duration.
- *
- * @param parcel The parcel to calculate the utility for.
- * @param agent The agent that is calculating the utility.
- * @param grid The grid of the environment.
- * @param config The game config.
- * @param deliveryZones The delivery zones of the environment.
- * @param pathfinder The pathfinder to use for calculating the path.
- * @returns The utility of the parcel.
- */
-export function calculateParcelUtility(
-  parcel: Parcel,
-  agent: Agent,
-  grid: Grid,
-  config: GameConfig,
-  deliveryZones: Point[],
-  pathfinder: Pathfinder,
-): number {
-  const pickupPath = pathfinder.findPath(
-    grid,
-    { x: Math.round(agent.x), y: Math.round(agent.y) }, // starting point
-    { x: parcel.x, y: parcel.y }, // goal point
-  )
-
-  if (!pickupPath) {
-    return -Infinity
-  }
-
-  const timeToPickup = pickupPath.moves.length * config.MOVEMENT_DURATION
-
-  let minTimeToDeliver = Infinity
-
-  for (const deliveryZone of deliveryZones) {
-    const timeToDeliverPath = pathfinder.findPath(
-      grid,
-      { x: parcel.x, y: parcel.y },
-      deliveryZone,
-    )
-    if (timeToDeliverPath) {
-      const timeToDeliver = timeToDeliverPath.cost * config.MOVEMENT_DURATION
-      if (timeToDeliver < minTimeToDeliver) {
-        minTimeToDeliver = timeToDeliver
-      }
-    }
-  }
-
-  if (minTimeToDeliver === Infinity) {
-    return -Infinity
-  }
-
-  const totalTimeCost = timeToPickup + minTimeToDeliver
-
-  const numDecays = Math.floor(
-    totalTimeCost /
-      parcelDecadingIntervalMapper[config.PARCEL_DECADING_INTERVAL],
-  )
-  const futureReward = parcel.reward - numDecays
-
-  // e.g. if the parcel is already decayed
-  if (futureReward <= 0 || futureReward - numDecays <= 0) {
-    return -Infinity
-  }
-
-  if (totalTimeCost === 0) {
-    return Infinity
-  }
-
-  return futureReward / totalTimeCost
-}
 
 /**
  * Finds the closest delivery zone to a given point.
@@ -205,4 +133,61 @@ export const parseTimeInterval = (interval: string) => {
     default:
       return 0
   }
+}
+
+/**
+ * Calculates the threat level for a single parcel based on other agents'
+ * proximity and movement direction.
+ * @param parcel The parcel to evaluate.
+ * @param beliefSet The agent's current belief set.
+ * @param pathfinder The pathfinder to use for calculating distances.
+ * @param grid
+ * @returns A numerical threat score. Higher is more threatened.
+ */
+export function calculateParcelThreat(
+  parcel: Parcel,
+  beliefSet: BeliefSet,
+  pathfinder: Pathfinder,
+  grid: Grid,
+): number {
+  // A tunable constant to control how much threat affects decisions.
+  // Higher values make the agent more cautious.
+  const THREAT_FACTOR = parcel.reward
+  let totalThreat = 0
+  const otherAgents = beliefSet.getOtherAgents()
+
+  for (const agent of otherAgents.values()) {
+    const agentMovement = beliefSet.getAgentMovementDirection(agent)
+
+    if (!agentMovement) {
+      continue // Agent is not moving.
+    }
+
+    // actual distance to the parcel using pathfinder
+    const distanceToParcel = pathfinder.findPath(
+      grid,
+      { x: Math.round(agent.x), y: Math.round(agent.y) },
+      { x: parcel.x, y: parcel.y },
+    )?.cost
+    // Avoid division by zero and threat from an agent already on the parcel
+    if (distanceToParcel == null || distanceToParcel < 1) continue
+
+    // Calculate the vector from the agent to the parcel
+    const vectorToParcel = {
+      x: parcel.x - agent.x,
+      y: parcel.y - agent.y,
+    }
+
+    // Dot product checks if the agent is moving towards the parcel.
+    const dotProduct =
+      agentMovement.dx * vectorToParcel.x + agentMovement.dy * vectorToParcel.y
+
+    if (dotProduct > 0) {
+      // Threat is higher if the agent is closer and moving more directly towards the parcel.
+      totalThreat +=
+        (THREAT_FACTOR * dotProduct) / (distanceToParcel * distanceToParcel)
+    }
+  }
+
+  return totalThreat
 }

@@ -280,6 +280,20 @@ class BeliefSet {
     return xDecimal !== 0 || yDecimal !== 0
   }
 
+  getAgentMovementDirection(agent: Agent): { dx: number; dy: number } | null {
+    if (!this.isAgentMoving(agent)) {
+      return null
+    }
+
+    const xDecimal = agent.x % 1
+    const yDecimal = agent.y % 1
+
+    return {
+      dx: xDecimal > 0.5 ? 1 : -1, // Moving right if decimal part > 0.5, else left
+      dy: yDecimal > 0.5 ? 1 : -1, // Moving down if decimal part > 0.5, else up
+    }
+  }
+
   /**
    * Add parcels to the carrying array when pickup occurs
    */
