@@ -291,4 +291,70 @@ export class TourPlanner {
 
     return totalFinalReward /// cumulativeTime
   }
+
+  /**
+   * Attempts to improve an existing tour by adding unused parcels
+   *
+   * @param currentTour - The existing tour to improve
+   * @param availableParcels - Array of parcels not yet in the tour
+   * @returns Improved tour or null if no improvement possible
+   */
+  public improveTour(
+    currentTour: Tour,
+    availableParcels: Parcel[],
+  ): Tour | null {
+    if (availableParcels.length === 0) {
+      return null
+    }
+
+    let bestTourSoFar = currentTour
+    let remainingParcels = [...availableParcels]
+
+    // Keep adding parcels until we can't improve the tour anymore
+    while (remainingParcels.length > 0) {
+      let bestUtilityForIteration = bestTourSoFar.utility
+      let bestParcelIndex = -1
+      let bestTourForIteration = bestTourSoFar
+
+      // Try each remaining parcel and find the one that gives best utility
+      remainingParcels.forEach((parcel, index) => {
+        const improvedTour = this.insertParcel(bestTourSoFar, parcel)
+
+        if (improvedTour.utility > bestUtilityForIteration) {
+          bestUtilityForIteration = improvedTour.utility
+          bestParcelIndex = index
+          bestTourForIteration = improvedTour
+        }
+      })
+
+      // If we found a better tour, update and remove the used parcel
+      if (bestParcelIndex !== -1) {
+        bestTourSoFar = bestTourForIteration
+        remainingParcels.splice(bestParcelIndex, 1)
+      } else {
+        // No more improvements possible
+        break
+      }
+    }
+
+    // Return improved tour only if it's actually better
+    return bestTourSoFar.utility > currentTour.utility ? bestTourSoFar : null
+  }
+
+  /**
+   * Gets parcels that are not included in the given tour
+   *
+   * @param tour - The tour to check against
+   * @param allParcels - All available parcels
+   * @returns Array of parcels not in the tour
+   */
+  public getUnusedParcels(tour: Tour, allParcels: Parcel[]): Parcel[] {
+    return allParcels.filter(
+      (parcel) =>
+        !tour.stops.some(
+          (stop) =>
+            stop.type === TourStopType.PICKUP && stop.parcel?.id === parcel.id,
+        ),
+    )
+  }
 }

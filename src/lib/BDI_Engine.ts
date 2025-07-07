@@ -15,7 +15,8 @@ class BDI_Engine {
   private beliefSet: BeliefSet
   private tourPlanner: TourPlanner
   private intentionExecutor: IntentionExecutor
-  private currentIntention: Intention | null = null
+  private intentionQueue: Intention[] = []
+  private isRevising: boolean = false
 
   constructor(
     beliefSet: BeliefSet,
@@ -33,65 +34,183 @@ class BDI_Engine {
   }
 
   /**
-   * The main agent loop.
+   * The main agent loop with intention revision.
    */
   run() {
-    setInterval(async () => {
-      // If there's an ongoing intention and it's an EXPLORE intention,
-      // check for new parcels and stop exploring if any are found
-      if (
-        this.currentIntention &&
-        !this.currentIntention.isFinished() &&
-        this.currentIntention.desireType === DesireType.EXPLORE_RANDOMLY &&
-        this.beliefSet.getParcels().size > 0
-      ) {
-        log.info(
-          'New parcels detected during exploration, stopping exploration',
-        )
-        this.intentionExecutor.stopCurrentExecution()
-      }
+    // Start the intention revision loop
+    this.intentionRevisionLoop()
 
+    // Main BDI loop for belief updates and desire generation
+    setInterval(async () => {
       // 1. SENSE: Beliefs are updated externally.
       // 2. DELIBERATE: Generate desires.
       const desires = this.deliberate()
 
-      // 3. FILTER: Choose the best intention.
+      // 3. FILTER: Choose the best intention and add to queue
       const newIntention = this.filter(desires)
 
-      // If there's an ongoing intention, check if we should switch
-      if (this.currentIntention && !this.currentIntention.isFinished()) {
-        if (newIntention && newIntention.isBetterThan(this.currentIntention)) {
-          this.intentionExecutor.stopCurrentExecution()
-          this.currentIntention = newIntention
-        }
-      } else if (newIntention) {
-        this.currentIntention = newIntention
-      }
-
-      // Execute the current intention if executor is not busy
-      if (this.currentIntention && !this.currentIntention.isFinished()) {
-        if (!this.intentionExecutor.isBusy()) {
-          // Execute asynchronously without blocking the main loop
-          this.intentionExecutor
-            .executeIntention(this.currentIntention)
-            .catch((error) => {
-              log.error('Error in intention execution:', error)
-            })
-        }
-      } else {
-        this.currentIntention = null // No valid intention
+      if (newIntention) {
+        await this.pushIntention(newIntention)
       }
     }, config.agent.loopInterval)
   }
 
   /**
+   * Intention revision loop - processes intention queue using existing IntentionExecutor
+   */
+  private async intentionRevisionLoop() {
+    while (true) {
+      // Process intention queue if not empty
+      if (this.intentionQueue.length > 0) {
+        // Get current intention from queue
+        const currentIntention = this.intentionQueue[0]
+
+        // Check if intention is still valid
+        if (!this.isIntentionValid(currentIntention)) {
+          if (currentIntention.isExecuting()) {
+            log.info('Stopping current intention as it is no longer valid')
+            this.intentionExecutor.stopCurrentExecution()
+          }
+
+          // Remove invalid intention from queue
+          this.intentionQueue.shift()
+          continue
+        }
+
+        if (!currentIntention.isFinished() && !currentIntention.isExecuting()) {
+          try {
+            await this.intentionExecutor.executeIntention(currentIntention)
+          } catch (error) {
+            log.error('Error in intention execution:', error)
+          }
+
+          // Remove completed intention from queue
+          if (currentIntention.isFinished()) {
+            this.intentionQueue.shift()
+          }
+        } else {
+          // Remove finished intention
+          this.intentionQueue.shift()
+        }
+      }
+
+      // Yield control to avoid blocking
+      await new Promise((resolve) => setImmediate(resolve))
+    }
+  }
+
+  /**
+   * IntentionRevisionRevise strategy - revises intention queue based on utility
+   */
+  private async pushIntention(newIntention: Intention): Promise<void> {
+    if (this.isRevising) return
+    this.isRevising = true
+
+    try {
+      // Check if intention already exists in queue
+      const existingIndex = this.intentionQueue.findIndex((i) =>
+        this.isSameIntention(i, newIntention),
+      )
+
+      if (existingIndex !== -1) {
+        if (newIntention.desireType === DesireType.PLAN_TOUR) {
+          log.info('Updating tour intention with better version')
+          this.intentionQueue[existingIndex] = newIntention
+          this.intentionExecutor.stopCurrentExecution()
+        }
+
+        return
+      }
+
+      // Add new intention to queue
+      this.intentionQueue.push(newIntention)
+
+      // Revise queue: order by utility function (tour utility)
+      this.reviseIntentionQueue()
+    } finally {
+      this.isRevising = false
+    }
+  }
+
+  /**
+   * Revises the intention queue by ordering intentions based on utility
+   */
+  private reviseIntentionQueue(): void {
+    // Filter out invalid intentions
+    this.intentionQueue = this.intentionQueue.filter((intention) =>
+      this.isIntentionValid(intention),
+    )
+
+    // Sort by utility (higher utility first)
+    this.intentionQueue.sort((a, b) => {
+      const utilityA = this.calculateIntentionUtility(a)
+      const utilityB = this.calculateIntentionUtility(b)
+      return utilityB - utilityA
+    })
+  }
+
+  /**
+   * Calculates utility for an intention
+   */
+  private calculateIntentionUtility(intention: Intention): number {
+    if (intention.desireType === DesireType.PLAN_TOUR && intention.tour) {
+      return intention.tour.utility
+    }
+    return 0 // default utility for EXPLORE_RANDOMLY desire
+  }
+
+  /**
+   * Checks if an intention is still valid.
+   *
+   * If an intention is finished or if it's a tour intention and some parcels
+   * in the tour are no longer available, it is considered invalid. A parcel can
+   * become unavailable if it's picked up by another agent or it simply expired.
+   *
+   * @param intention - The intention to check.
+   * @returns True if the intention is still valid, false otherwise.
+   */
+  private isIntentionValid(intention: Intention): boolean {
+    if (intention.isFinished()) {
+      return false
+    }
+
+    if (intention.desireType === DesireType.PLAN_TOUR && intention.tour) {
+      for (const stop of intention.tour.stops) {
+        if (stop.type === TourStopType.PICKUP && stop.parcel) {
+          const parcel = this.beliefSet.getParcel(stop.parcel.id)
+          if (!parcel) {
+            return false
+          }
+        }
+      }
+    }
+
+    return true
+  }
+
+  /**
+   * Checks if two intentions are the same
+   */
+  private isSameIntention(a: Intention, b: Intention): boolean {
+    if (a.desireType !== b.desireType) {
+      return false
+    }
+
+    return (
+      (a.desireType === DesireType.PLAN_TOUR &&
+        b.desireType === DesireType.PLAN_TOUR &&
+        a.tour &&
+        b.tour &&
+        a.tour.id === b.tour.id) ||
+      a.desireType === b.desireType // check for the EXPLORE_RANDOMLY desire
+    )
+  }
+
+  /**
    * Generates a list of possible desires based on the current beliefs.
-   * @returns {Desire[]}
    */
   deliberate(): Desire[] {
     const desires: Desire[] = []
-
-    // Consider both visible and outdated parcels, but prioritize visible ones
     const parcels = this.beliefSet.getParcels()
 
     if (parcels.size > 0) {
@@ -124,39 +243,23 @@ class BDI_Engine {
       const parcels = Array.from(this.beliefSet.getParcels().values())
       let tour: Tour | null = null
 
-      // If we have a current tour, try to improve it
-      if (this.currentIntention?.tour) {
-        const unusedParcels = parcels.filter(
-          // Avoid considering parcels already in the tour
-          (parcel) =>
-            !this.currentIntention!.tour!.stops.some(
-              (stop) =>
-                stop.type === TourStopType.PICKUP &&
-                stop.parcel?.id === parcel.id,
-            ),
+      // Check if we have a current tour intention to improve
+      const currentTourIntention = this.intentionQueue.find(
+        (i) => i.desireType === DesireType.PLAN_TOUR && i.tour,
+      )
+
+      if (currentTourIntention?.tour) {
+        // Try to improve existing tour
+        const unusedParcels = this.tourPlanner.getUnusedParcels(
+          currentTourIntention.tour,
+          parcels,
         )
 
         if (unusedParcels.length > 0) {
-          let bestImprovedTour = this.currentIntention.tour
-
-          // Try inserting each unused parcel and keep track of the best tour
-          for (const parcel of unusedParcels) {
-            const improvedTour = this.tourPlanner.insertParcel(
-              this.currentIntention.tour,
-              parcel,
-            )
-
-            if (improvedTour.utility > bestImprovedTour.utility) {
-              bestImprovedTour = improvedTour
-            }
-          }
-
-          // If we found a better tour, use it
-          if (bestImprovedTour.utility > this.currentIntention.tour.utility) {
-            tour = bestImprovedTour
-          } else {
-            return null // Return null if no better tour was found
-          }
+          tour = this.tourPlanner.improveTour(
+            currentTourIntention.tour,
+            unusedParcels,
+          )
         }
       } else {
         // Create a new tour
@@ -165,6 +268,8 @@ class BDI_Engine {
 
       if (tour && tour.stops.length > 0) {
         return new Intention(DesireType.PLAN_TOUR, tour)
+      } else {
+        return null
       }
     }
 
