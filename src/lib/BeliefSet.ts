@@ -137,6 +137,16 @@ class BeliefSet {
     const seenParcels = new Set<string>()
     const currentTime = Date.now()
 
+    // Create a map of current parcel positions for quick lookup
+    const currentParcelPositions = new Map<string, Parcel[]>()
+    for (const p of parcelsData) {
+      const posKey = `${p.x},${p.y}`
+      if (!currentParcelPositions.has(posKey)) {
+        currentParcelPositions.set(posKey, [])
+      }
+      currentParcelPositions.get(posKey)!.push(p)
+    }
+
     // Update parcels that are currently visible
     for (const p of parcelsData) {
       // Remove parcels that have been picked up by someone
@@ -156,6 +166,19 @@ class BeliefSet {
     // Mark parcels that are no longer visible as outdated and apply immediate decay
     for (const [id, parcel] of this.parcels.entries()) {
       if (!seenParcels.has(id) && !parcel.outdated) {
+        // Check if the cell where this parcel was last seen is now empty
+        const posKey = `${parcel.x},${parcel.y}`
+        const parcelsAtPosition = currentParcelPositions.get(posKey) || []
+
+        // If the cell is empty (no parcels at this position) or if the parcels'
+        // IDs don't contain the current parcel's ID, then remove the parcel comletely.
+        if (
+          parcelsAtPosition.length === 0 ||
+          !parcelsAtPosition.some((p) => p.id === id)
+        ) {
+          this.parcels.delete(id)
+          continue
+        }
         const decayIntervalMs = parseTimeInterval(
           this.config.PARCEL_DECADING_INTERVAL!,
         )
