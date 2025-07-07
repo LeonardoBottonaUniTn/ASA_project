@@ -1,17 +1,18 @@
-import {
-  Agent,
-  GameConfig,
-  Grid,
-  Parcel,
-  Point,
-  TileType,
-} from '../types/index.js'
+import { Grid, Parcel, Point, TileType } from '../types/index.js'
 import Logger from '../utils/Logger.js'
 import Pathfinder from '../lib/Pathfinder.js'
 import BeliefSet from '../lib/BeliefSet.js'
-import path from 'path'
 
 const log = Logger('Utils')
+
+/**
+ * Calculates the Manhattan distance between two points.
+ * @param a The first point.
+ * @param b The second point.
+ */
+export const manhattanDistance = (a: Point, b: Point): number => {
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
+}
 
 /**
  * Finds the closest delivery zone to a given point.

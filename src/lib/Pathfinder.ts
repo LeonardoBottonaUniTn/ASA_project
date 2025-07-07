@@ -1,6 +1,6 @@
 import Logger from '../utils/Logger.js'
 import { Grid, Point, TileType, Path, Heuristic, Move } from '../types/index.js'
-import { manhattanDistance } from './heuristics.js'
+import { manhattanDistance } from '../utils/utils.js'
 
 const log = Logger('Pathfinder')
 
