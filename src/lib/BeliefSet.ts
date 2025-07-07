@@ -68,7 +68,7 @@ class BeliefSet {
   }
 
   /**
-   * Returns the list of other agents.
+   * Returns the list of other agents' last known states.
    * @returns {Map<string, Agent>}
    */
   getOtherAgents(): Map<string, Agent> {
@@ -290,7 +290,7 @@ class BeliefSet {
 
     return {
       dx: xDecimal > 0.5 ? 1 : -1, // Moving right if decimal part > 0.5, else left
-      dy: yDecimal > 0.5 ? 1 : -1, // Moving down if decimal part > 0.5, else up
+      dy: yDecimal < 0.5 ? 1 : -1, // Moving down if decimal part < 0.5, else up
     }
   }
 
