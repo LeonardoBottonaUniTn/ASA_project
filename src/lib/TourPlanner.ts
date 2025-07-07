@@ -237,17 +237,7 @@ export class TourPlanner {
 
         // Apply decay to each parcel in inventory
         for (const item of simulatedInventory) {
-          //calculate the threat level for the parcel
-          const threatLevel = calculateParcelThreat(
-            item.parcel,
-            this.beliefSet,
-            this.pathfinder,
-            this.beliefSet.getGrid() as Grid,
-          )
-          /* log.info(
-            `Threat level for parcel ${item.parcel.id}: ${threatLevel} on total reward ${item.reward}`,
-          ) */
-          item.reward -= decayPerParcelThisLeg + threatLevel // Apply decay and threat level
+          item.reward -= decayPerParcelThisLeg
           if (item.reward < 0) {
             item.reward = 0 // Ensure reward doesn't go negative
           }
@@ -262,7 +252,17 @@ export class TourPlanner {
       if (stop.type === TourStopType.PICKUP && stop.parcel) {
         // Pick up the parcel
         const numDecaysForNewParcel = Math.ceil(cumulativeTime / decayInterval)
-        const newParcelReward = stop.parcel.reward - numDecaysForNewParcel
+
+        // Calculate the threat level for the parcel being picked up
+        const threatLevel = calculateParcelThreat(
+          stop.parcel,
+          this.beliefSet,
+          this.pathfinder,
+          this.beliefSet.getGrid() as Grid,
+        )
+
+        const newParcelReward =
+          stop.parcel.reward - numDecaysForNewParcel - threatLevel
 
         // Add to simulated inventory
         simulatedInventory.push({
