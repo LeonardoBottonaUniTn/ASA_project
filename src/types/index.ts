@@ -69,6 +69,7 @@ export interface TourStop {
 }
 
 export interface Tour {
+  id: string
   stops: TourStop[]
   utility: number
 }

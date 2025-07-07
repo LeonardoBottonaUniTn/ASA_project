@@ -1,4 +1,4 @@
-import { Grid, Parcel, Tour, TourStopType } from '../types/index.js'
+import { Grid, Parcel, Tour, TourStop, TourStopType } from '../types/index.js'
 import Pathfinder from './Pathfinder.js'
 import Logger from '../utils/Logger.js'
 import {
@@ -7,6 +7,7 @@ import {
   calculateParcelThreat,
 } from '../utils/utils.js'
 import BeliefSet from './BeliefSet.js'
+import { v4 as uuidv4 } from 'uuid'
 
 const log = Logger('TourPlanner')
 
@@ -43,6 +44,7 @@ export class TourPlanner {
       )
 
       const tempTour: Tour = {
+        id: uuidv4(),
         stops: [
           {
             type: TourStopType.PICKUP,
@@ -57,7 +59,7 @@ export class TourPlanner {
         utility: 0,
       }
 
-      const utility = this.calculateTourUtility(tempTour)
+      const utility = this.calculateTourUtility(tempTour.stops)
 
       if (utility > bestParcelUtility) {
         bestParcelUtility = utility
@@ -78,6 +80,7 @@ export class TourPlanner {
 
     // Create tour with pickup and delivery stops
     const bestTour: Tour = {
+      id: uuidv4(),
       stops: [
         {
           type: TourStopType.PICKUP,
@@ -97,7 +100,7 @@ export class TourPlanner {
 
   public insertParcel(tour: Tour, parcel: Parcel): Tour {
     let bestTour: Tour = tour
-    let bestUtility = this.calculateTourUtility(tour)
+    let bestUtility = this.calculateTourUtility(tour.stops)
     let bestInsertionIndex = -1
 
     const lastPickupIndex = tour.stops.length - 1
@@ -125,11 +128,12 @@ export class TourPlanner {
       }
 
       const tempTour: Tour = {
+        id: tour.id,
         stops: newStops,
         utility: 0,
       }
 
-      tempTour.utility = this.calculateTourUtility(tempTour)
+      tempTour.utility = this.calculateTourUtility(tempTour.stops)
 
       if (tempTour.utility > bestUtility) {
         bestTour = tempTour
@@ -155,8 +159,9 @@ export class TourPlanner {
     )
 
     const updatedTour: Tour = {
+      id: tour.id,
       stops: updatedStops,
-      utility: this.calculateTourUtility({ stops: updatedStops, utility: 0 }),
+      utility: this.calculateTourUtility(updatedStops),
     }
 
     return updatedTour
@@ -185,12 +190,11 @@ export class TourPlanner {
    * The final utility represents reward per unit time, optimizing for
    * both high rewards and efficient delivery times.
    *
-   * @param tour - The tour to evaluate
-   *
+   * @param stops - The list of stops in the tour
    *
    * @returns The calculated utility value, or -Infinity if no valid path exists
    */
-  private calculateTourUtility(tour: Tour): number {
+  private calculateTourUtility(stops: TourStop[]): number {
     // Initialization
     let cumulativeTime = 0
     let lastPosition = {
@@ -213,7 +217,7 @@ export class TourPlanner {
     const movementDuration = this.beliefSet.getConfig().MOVEMENT_DURATION!
 
     // Simulate each stop in the tour
-    for (const stop of tour.stops) {
+    for (const stop of stops) {
       // Get path to this stop
       const path = this.pathfinder.findPath(
         this.beliefSet.getGrid() as Grid,
