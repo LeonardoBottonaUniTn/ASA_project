@@ -138,11 +138,44 @@ export const parseTimeInterval = (interval: string) => {
 /**
  * Calculates the threat level for a single parcel based on other agents'
  * proximity and movement direction.
- * @param parcel The parcel to evaluate.
- * @param beliefSet The agent's current belief set.
- * @param pathfinder The pathfinder to use for calculating distances.
- * @param grid
- * @returns A numerical threat score. Higher is more threatened.
+ *
+ * ## Overview
+ *
+ * The threat assessment considers two factors:
+ * 1. **Proximity Threat**: All nearby agents pose a baseline threat simply by being
+ *    close to the parcel, as they could potentially move toward it at any time.
+ * 2. **Directional Threat**: Moving agents receive an additional threat bonus based
+ *    on how directly they're moving toward the parcel, representing immediate intent.
+ *
+ * ## Mathematical Formula
+ *
+ * For each agent, the threat is calculated as:
+ *
+ * ```
+ * proximity_threat = THREAT_FACTOR / distance²
+ *
+ * For stationary agents:
+ * agent_threat = proximity_threat × BASE_THREAT_MULTIPLIER
+ *
+ * For moving agents:
+ * directionality = (movement_vector · parcel_vector) / ||parcel_vector||
+ * agent_threat = proximity_threat × (BASE_THREAT_MULTIPLIER + DIRECTIONALITY_BONUS × directionality)
+ *
+ * total_threat = Σ(agent_threat) for all agents
+ * ```
+ *
+ * Where:
+ * - `distance` is the pathfinding distance from agent to parcel
+ * - `movement_vector` is the agent's current movement direction (dx, dy)
+ * - `parcel_vector` is the vector from agent position to parcel position
+ * - `directionality` ∈ [0,1] represents how directly the agent moves toward the parcel
+ * - The inverse square law (1/distance²) ensures nearby agents dominate the threat calculation
+ *
+ * @param parcel The parcel to evaluate threat for
+ * @param beliefSet The agent's current belief set containing other agents' positions
+ * @param pathfinder The pathfinder instance for calculating actual distances
+ * @param grid The grid representation of the environment
+ * @returns A numerical threat score where higher values indicate greater threat
  */
 export function calculateParcelThreat(
   parcel: Parcel,
@@ -150,43 +183,61 @@ export function calculateParcelThreat(
   pathfinder: Pathfinder,
   grid: Grid,
 ): number {
-  // A tunable constant to control how much threat affects decisions.
-  // Higher values make the agent more cautious.
+  // Tunable constants to control threat calculation
   const THREAT_FACTOR = parcel.reward
+  const BASE_THREAT_MULTIPLIER = 0.3 // Base threat for stationary agents (fraction of moving threat)
+  const DIRECTIONALITY_BONUS = 0.7 // Additional threat multiplier for agents moving toward parcel
+
   let totalThreat = 0
   const otherAgents = beliefSet.getOtherAgents()
 
   for (const agent of otherAgents.values()) {
-    const agentMovement = beliefSet.getAgentMovementDirection(agent)
-
-    if (!agentMovement) {
-      continue // Agent is not moving.
-    }
-
-    // actual distance to the parcel using pathfinder
+    // Calculate actual distance to the parcel using pathfinder
     const distanceToParcel = pathfinder.findPath(
       grid,
       { x: Math.round(agent.x), y: Math.round(agent.y) },
       { x: parcel.x, y: parcel.y },
     )?.cost
+
     // Avoid division by zero and threat from an agent already on the parcel
     if (distanceToParcel == null || distanceToParcel < 1) continue
 
-    // Calculate the vector from the agent to the parcel
-    const vectorToParcel = {
-      x: parcel.x - agent.x,
-      y: parcel.y - agent.y,
+    // Base threat calculation (proximity-based), the thread decays with the
+    // square of the distance, not just linearly.
+    const proximityThreat =
+      THREAT_FACTOR / (distanceToParcel * distanceToParcel)
+    let agentThreat = proximityThreat * BASE_THREAT_MULTIPLIER
+
+    // Check if agent is moving and add directionality bonus
+    const agentMovement = beliefSet.getAgentMovementDirection(agent)
+    if (agentMovement) {
+      // Calculate the vector from the agent to the parcel
+      const vectorToParcel = {
+        x: parcel.x - agent.x,
+        y: parcel.y - agent.y,
+      }
+
+      // Dot product checks if the agent is moving towards the parcel
+      const dotProduct =
+        agentMovement.dx * vectorToParcel.x +
+        agentMovement.dy * vectorToParcel.y
+
+      if (dotProduct > 0) {
+        // Normalize the dot product by the magnitude of the vector to parcel
+        // This gives us a value between 0 and 1 representing how directly the agent is moving toward the parcel
+        const vectorMagnitude = Math.sqrt(
+          vectorToParcel.x * vectorToParcel.x +
+            vectorToParcel.y * vectorToParcel.y,
+        )
+        const normalizedDirectionality = dotProduct / vectorMagnitude
+
+        // Add directionality bonus scaled by how directly the agent is moving toward the parcel
+        agentThreat +=
+          proximityThreat * DIRECTIONALITY_BONUS * normalizedDirectionality
+      }
     }
 
-    // Dot product checks if the agent is moving towards the parcel.
-    const dotProduct =
-      agentMovement.dx * vectorToParcel.x + agentMovement.dy * vectorToParcel.y
-
-    if (dotProduct > 0) {
-      // Threat is higher if the agent is closer and moving more directly towards the parcel.
-      totalThreat +=
-        (THREAT_FACTOR * dotProduct) / (distanceToParcel * distanceToParcel)
-    }
+    totalThreat += agentThreat
   }
 
   return totalThreat
