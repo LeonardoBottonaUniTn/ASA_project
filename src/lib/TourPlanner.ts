@@ -170,29 +170,34 @@ export class TourPlanner {
   /**
    * Calculates the utility value for a given tour by simulating its execution.
    *
-   * The utility U is computed as: U = R/T where
-   * R = total final reward
-   * T = total time
+   * The utility is computed as the total final reward (R) obtained from all parcels
+   * in the tour after accounting for decay and threat factors.
    *
    * The reward calculation considers:
    * 1. Initial parcel rewards: R₀
-   * 2. Time-based decay of rewards for carried parcels
+   * 2. Time-based decay of rewards for carried parcels during travel
    * 3. Accelerated decay based on number of carried parcels (n)
+   * 4. Threat level from competing agents for parcels being picked up
    *
-   * The decay formula for each parcel p at time t is:
+   * The decay formula for each carried parcel p during travel time t is:
    * R(p,t) = R₀(p) - ⌈t/I⌉ * n
    * where:
    * - I is the PARCEL_DECADING_INTERVAL
    * - n is the number of carried parcels
    * - ⌈x⌉ represents the ceiling function
-   * - t is the time elapsed since the parcel was picked up
+   * - t is the time elapsed during the current leg of travel
    *
-   * The final utility represents reward per unit time, optimizing for
-   * both high rewards and efficient delivery times.
+   * For parcels being picked up, the reward is calculated as:
+   * R(p) = R₀(p) - totalDecayPeriods - threatLevel
+   * where totalDecayPeriods accounts for the time elapsed until pickup.
+   *
+   * The final utility represents the total expected reward from completing
+   * the tour, optimizing for maximum reward collection while accounting
+   * for time-based decay and competitive threats.
    *
    * @param stops - The list of stops in the tour
    *
-   * @returns The calculated utility value, or -Infinity if no valid path exists
+   * @returns The calculated total reward utility, or -Infinity if no valid path exists
    */
   private calculateTourUtility(stops: TourStop[]): number {
     // Initialization
@@ -261,8 +266,10 @@ export class TourPlanner {
           this.beliefSet.getGrid() as Grid,
         )
 
-        const newParcelReward =
-          stop.parcel.reward - numDecaysForNewParcel - threatLevel
+        const newParcelReward = Math.max(
+          0,
+          stop.parcel.reward - numDecaysForNewParcel - threatLevel,
+        )
 
         // Add to simulated inventory
         simulatedInventory.push({
@@ -282,6 +289,6 @@ export class TourPlanner {
 
     if (cumulativeTime === 0) return 0
 
-    return totalFinalReward / cumulativeTime
+    return totalFinalReward /// cumulativeTime
   }
 }
