@@ -282,7 +282,13 @@ class BeliefSet {
     }
   }
 
-  // Utility methods can be added here, e.g.,
+  // ------------------------ Utility methods  ------------------------
+
+  /**
+   * Returns a specific parcel by its ID.
+   * @param {string} id - The ID of the parcel.
+   * @returns {ExtendedParcel | undefined}
+   */
   getParcel(id: string): ExtendedParcel | undefined {
     return this.parcels.get(id)
   }
