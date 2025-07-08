@@ -1,0 +1,7 @@
+// Demo bot tokens for use in multi-agent startup scripts
+// Replace the placeholder strings with the actual tokens from your environment or demo files
+
+export const DEMO_BOT_1_TOKEN =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjVhZGI0ZiIsIm5hbWUiOiJib3QiLCJ0ZWFtSWQiOiI1Yzk3NmYiLCJ0ZWFtTmFtZSI6Im5wYyIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzUxNjM5Mjk1fQ.V9UWGCAvUewI5cO4R2QBkusNnKxqKW0aNSA-rD4W5wM'
+export const DEMO_BOT_2_TOKEN =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjJjZTMzYyIsIm5hbWUiOiJib3QyIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3NTE4OTc2NTJ9.IRx1CLQN5LI3zlSePWFPfDaBSOL3wwVUaPUfWdusKDI'

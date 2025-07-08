@@ -5,6 +5,7 @@ import {
   findClosestDeliveryZone,
   parcelDecadingIntervalMapper,
   calculateParcelThreat,
+  assessParcelCompetition,
 } from '../utils/utils.js'
 import BeliefSet from './BeliefSet.js'
 
@@ -26,11 +27,27 @@ export class TourPlanner {
    * @returns tour with highest utility including delivery stop
    */
   public createTour(): Tour | null {
-    // Find the parcel with highest utility
+    // Find the parcel with highest utility considering competitive factors
     let bestParcel: Parcel | null = null
     let bestParcelUtility = -Infinity
 
     for (const parcel of this.beliefSet.getParcels().values()) {
+      // Assess competitive landscape for this parcel
+      const competition = assessParcelCompetition(
+        parcel,
+        this.beliefSet,
+        this.pathfinder,
+        this.beliefSet.getGrid() as Grid,
+      )
+
+      // Skip parcels where we have a significant competitive disadvantage
+      if (!competition.shouldPursue && competition.relativeAdvantage < -2) {
+        log.debug(
+          `Skipping parcel ${parcel.id} due to competitive disadvantage: ${competition.relativeAdvantage}`,
+        )
+        continue
+      }
+
       // Create a temporary tour with just this parcel to calculate its utility
       const deliveryZones = this.beliefSet.getDeliveryZones()
       if (deliveryZones.length === 0) continue
@@ -59,8 +76,12 @@ export class TourPlanner {
 
       const utility = this.calculateTourUtility(tempTour)
 
-      if (utility > bestParcelUtility) {
-        bestParcelUtility = utility
+      // Apply competitive adjustment to utility
+      const competitiveUtility =
+        utility * (1 + competition.competitiveScore * 0.1)
+
+      if (competitiveUtility > bestParcelUtility) {
+        bestParcelUtility = competitiveUtility
         bestParcel = parcel
       }
     }
