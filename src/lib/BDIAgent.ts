@@ -5,6 +5,10 @@ import { DesireType, Predicate } from '../types/index.js'
 export class BDI_Agent {
   #intentionQueue: Intention[] = new Array<Intention>()
 
+  get currentIntention() {
+    return this.#intentionQueue[0]
+  }
+
   /**
    * IntentionRevisionReplace loop
    */
@@ -46,7 +50,9 @@ export class BDI_Agent {
           })
 
         if (!result) {
-          this.log("Couldn't complete intention:", intention)
+          this.log("Couldn't complete intention:", intention.predicate)
+        } else {
+          this.log('Completed intention:', intention.predicate)
         }
 
         // Remove from the queue
@@ -58,9 +64,6 @@ export class BDI_Agent {
   }
 
   async push(predicate: Predicate) {
-    // add utility threshold to prevent rapid intention switching
-    const UTILITY_THRESHOLD = 0.05
-
     // this.log('Revising intention queue. Received:', predicate)
 
     // check if already queued
@@ -71,26 +74,12 @@ export class BDI_Agent {
       return // intention is already being achieved
     }
 
-    const createAndPushIntention = () => {
-      this.log('IntentionRevisionReplace.push', predicate)
-      const intention = new Intention(this, predicate)
-      this.#intentionQueue.push(intention)
-    }
+    this.log('IntentionRevisionReplace.push', predicate)
+    const intention = new Intention(this, predicate)
+    this.#intentionQueue.push(intention)
 
-    if (this.#intentionQueue.length > 0) {
-      const current = this.#intentionQueue[0]
-
-      // only switch if new intention is significantly better
-      if (predicate.utility > current.predicate.utility + UTILITY_THRESHOLD) {
-        createAndPushIntention()
-
-        // stop current intention if it exists
-        if (current) {
-          current.stop()
-        }
-      }
-    } else {
-      createAndPushIntention()
+    if (last) {
+      last.stop()
     }
   }
 
