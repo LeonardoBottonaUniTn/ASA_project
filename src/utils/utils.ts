@@ -1,9 +1,5 @@
 import { Grid, Parcel, Point, TileType } from '../types/index.js'
-import Logger from '../utils/Logger.js'
-import Pathfinder from '../lib/Pathfinder.js'
-import BeliefSet from '../lib/BeliefSet.js'
-
-const log = Logger('Utils')
+import { beliefSet, pathFinder } from '../DeliverooDriver.js'
 
 /**
  * Calculates the Manhattan distance between two points.
@@ -17,26 +13,24 @@ export const manhattanDistance = (a: Point, b: Point): number => {
 /**
  * Finds the closest delivery zone to a given point.
  * @param point The point to find the closest delivery zone to.
- * @param deliveryZones The delivery zones of the environment.
- * @param grid The grid of the environment.
- * @param pathfinder The pathfinder to use for calculating the path.
  * @returns The closest delivery zone to the given point.
  *
  * @todo it might be a better solution to pre-compute a map of the closest
  * delivery zone to each tile in the map such that to avoid useless re-computations
  * during the game.
  */
-export function findClosestDeliveryZone(
-  point: Point,
-  deliveryZones: Point[],
-  grid: Grid,
-  pathfinder: Pathfinder,
-): Point {
+export function findClosestDeliveryZone(point: Point): Point {
   let closestDeliveryZone: Point | null = null
   let minDistance = Infinity
 
+  const deliveryZones = beliefSet.getDeliveryZones()
+
+  if (deliveryZones.length === 0) {
+    throw new Error('No delivery zones found in the grid')
+  }
+
   for (const deliveryZone of deliveryZones) {
-    const path = pathfinder.findPath(grid, point, deliveryZone)
+    const path = pathFinder.findPath(point, deliveryZone)
     if (path) {
       if (path.cost < minDistance) {
         minDistance = path.cost
@@ -45,7 +39,11 @@ export function findClosestDeliveryZone(
     }
   }
 
-  return closestDeliveryZone || deliveryZones[0]
+  if (!closestDeliveryZone) {
+    throw new Error('No reachable delivery zone found')
+  }
+
+  return closestDeliveryZone
 }
 
 /**
@@ -81,7 +79,7 @@ export function printGrid(grid: Grid): void {
   }
 
   gridString += '└' + '─'.repeat(grid.width * 2 + 1) + '┘'
-  log.info(`Grid:\n${gridString}`)
+  // console.log(`Grid:\n${gridString}`)
 }
 
 /**
@@ -89,7 +87,9 @@ export function printGrid(grid: Grid): void {
  *
  * @returns {Point} A random walkable tile.
  */
-export const getRandomWalkableTile = (grid: Grid): Point => {
+export const getRandomWalkableTile = (): Point => {
+  const grid = beliefSet.getGrid() as Grid
+
   while (true) {
     const x = Math.floor(Math.random() * grid.width)
     const y = Math.floor(Math.random() * grid.height)
@@ -136,6 +136,24 @@ export const parseTimeInterval = (interval: string) => {
   }
 }
 
+export const calculateParcelUtility = (
+  parcel: Parcel,
+  agentPos: Point,
+  totalCarriedReward: Number,
+  numCarriedParcels: Number,
+) => {
+  return -1
+}
+
+export const calculateDeliveryUtility = (
+  agentPos: Point,
+  totalCarriedReward: Number,
+  numCarriedParcels: Number,
+  closestDeliveryZone: Point,
+) => {
+  return -1
+}
+
 /**
  * Calculates the threat level for a single parcel based on other agents'
  * proximity and movement direction.
@@ -173,17 +191,9 @@ export const parseTimeInterval = (interval: string) => {
  * - The inverse square law (1/distance²) ensures nearby agents dominate the threat calculation
  *
  * @param parcel The parcel to evaluate threat for
- * @param beliefSet The agent's current belief set containing other agents' positions
- * @param pathfinder The pathfinder instance for calculating actual distances
- * @param grid The grid representation of the environment
  * @returns A numerical threat score where higher values indicate greater threat
  */
-export function calculateParcelThreat(
-  parcel: Parcel,
-  beliefSet: BeliefSet,
-  pathfinder: Pathfinder,
-  grid: Grid,
-): number {
+export function calculateParcelThreat(parcel: Parcel): number {
   // Tunable constants to control threat calculation
   const THREAT_FACTOR = parcel.reward
   const BASE_THREAT_MULTIPLIER = 0.3 // Base threat for stationary agents (fraction of moving threat)
@@ -194,8 +204,7 @@ export function calculateParcelThreat(
 
   for (const agent of otherAgents.values()) {
     // Calculate actual distance to the parcel using pathfinder
-    const distanceToParcel = pathfinder.findPath(
-      grid,
+    const distanceToParcel = pathFinder.findPath(
       { x: Math.round(agent.x), y: Math.round(agent.y) },
       { x: parcel.x, y: parcel.y },
     )?.cost
@@ -205,8 +214,7 @@ export function calculateParcelThreat(
 
     // Base threat calculation (proximity-based), the thread decays with the
     // square of the distance, not just linearly.
-    const proximityThreat =
-      THREAT_FACTOR / (distanceToParcel * distanceToParcel)
+    const proximityThreat = THREAT_FACTOR / (distanceToParcel * distanceToParcel)
     let agentThreat = proximityThreat * BASE_THREAT_MULTIPLIER
 
     // Check if agent is moving and add directionality bonus
@@ -219,22 +227,16 @@ export function calculateParcelThreat(
       }
 
       // Dot product checks if the agent is moving towards the parcel
-      const dotProduct =
-        agentMovement.dx * vectorToParcel.x +
-        agentMovement.dy * vectorToParcel.y
+      const dotProduct = agentMovement.dx * vectorToParcel.x + agentMovement.dy * vectorToParcel.y
 
       if (dotProduct > 0) {
         // Normalize the dot product by the magnitude of the vector to parcel
         // This gives us a value between 0 and 1 representing how directly the agent is moving toward the parcel
-        const vectorMagnitude = Math.sqrt(
-          vectorToParcel.x * vectorToParcel.x +
-            vectorToParcel.y * vectorToParcel.y,
-        )
+        const vectorMagnitude = Math.sqrt(vectorToParcel.x * vectorToParcel.x + vectorToParcel.y * vectorToParcel.y)
         const normalizedDirectionality = dotProduct / vectorMagnitude
 
         // Add directionality bonus scaled by how directly the agent is moving toward the parcel
-        agentThreat +=
-          proximityThreat * DIRECTIONALITY_BONUS * normalizedDirectionality
+        agentThreat += proximityThreat * DIRECTIONALITY_BONUS * normalizedDirectionality
       }
     }
 

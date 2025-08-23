@@ -48,29 +48,16 @@ export interface Point {
  * @enum {string}
  */
 export enum DesireType {
-  EXPLORE_RANDOMLY = 'EXPLORE_RANDOMLY',
-  PLAN_TOUR = 'PLAN_TOUR',
-}
-
-export interface Desire {
-  type: DesireType
-}
-
-export enum TourStopType {
+  DELIVER = 'DELIVER',
   PICKUP = 'PICKUP',
-  DELIVERY = 'DELIVERY',
+  EXPLORATION = 'EXPLORATION',
+  GO_TO = 'GO_TO',
 }
 
-export interface TourStop {
-  type: TourStopType
-  parcel?: Parcel
-  position: Point
-  utility?: number // used for delivery stops onlu
-}
-
-export interface Tour {
-  id: string
-  stops: TourStop[]
+export interface Predicate {
+  type: DesireType
+  destination: Point
+  parcel_id?: string // parcel_id is only defined for pickup desires
   utility: number
 }
 
@@ -82,7 +69,7 @@ export enum Move {
 }
 
 export interface Path {
-  moves: (Move | Point)[]
+  moves: Move[]
   cost: number
 }
 
@@ -106,6 +93,3 @@ export interface GameConfig {
   AGENT_SPEED: string
   CLOCK: number
 }
-
-export const logLevels = ['debug', 'info', 'warn', 'error'] as const
-export type LogLevel = (typeof logLevels)[number]

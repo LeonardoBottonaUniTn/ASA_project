@@ -1,7 +1,3 @@
-import Logger from '../utils/Logger.js'
-
-const log = Logger('ActionHandler')
-
 class ActionHandler {
   private api: any
 

@@ -1,17 +1,5 @@
-import config from '../config.js'
-import {
-  Agent,
-  Parcel,
-  Grid,
-  Point,
-  TileType,
-  GameConfig,
-  ExtendedParcel,
-} from '../types/index.js'
-import Logger from '../utils/Logger.js'
+import { Agent, Parcel, Grid, Point, TileType, GameConfig, ExtendedParcel } from '../types/index.js'
 import { parseTimeInterval } from '../utils/utils.js'
-
-const log = Logger('BeliefSet')
 
 class BeliefSet {
   private me: Partial<Agent> = {}
@@ -21,19 +9,7 @@ class BeliefSet {
   private deliveryZones: Point[] = []
   private otherAgents: Map<string, Agent> = new Map()
   private config: Partial<GameConfig> = {}
-  private decayTimer: NodeJS.Timeout | null = null
-
-  constructor() {
-    // Log state periodically for debugging
-    setInterval(() => {
-      log.debug('Current Beliefs:', {
-        me: this.me,
-        carrying: !!this.carrying,
-        parcels: this.parcels.size,
-        agents: this.otherAgents.size,
-      })
-    }, config.agent.logInterval)
-  }
+  private activeParcelPositions: Set<string> = new Set()
 
   /**
    * Returns the current agent's state.
@@ -44,7 +20,7 @@ class BeliefSet {
   }
 
   /**
-   * Returns the current agent's carrying parcela.
+   * Returns the current agent's carrying parcels.
    * @returns {Parcel[]}
    */
   getCarryingParcels(): Parcel[] {
@@ -60,11 +36,46 @@ class BeliefSet {
   }
 
   /**
-   * Returns the list of parcels.
-   * @returns {Map<string, ExtendedParcel>}
+   * Returns the list of valid parcels (computes decay lazily and removes expired).
+   * @returns {ExtendedParcel[]}
    */
-  getParcels(): Map<string, ExtendedParcel> {
-    return this.parcels
+  getParcels(): ExtendedParcel[] {
+    this.cleanupExpiredParcels()
+    return Array.from(this.parcels.values())
+  }
+
+  /**
+   * Returns a specific valid parcel by its ID.
+   * @param {string} id - The ID of the parcel.
+   * @returns {ExtendedParcel | undefined}
+   */
+  getParcel(id: string): ExtendedParcel | undefined {
+    this.cleanupExpiredParcels()
+    return this.parcels.get(id)
+  }
+
+  /**
+   * Cleans up all expired parcels by computing their current rewards.
+   */
+  private cleanupExpiredParcels() {
+    const currentTime = Date.now()
+    const decayIntervalMs = parseTimeInterval(this.config.PARCEL_DECADING_INTERVAL!)
+
+    for (const [id, parcel] of this.parcels.entries()) {
+      if (parcel.outdated && parcel.lastSeenTimestamp && parcel.lastSeenReward !== undefined) {
+        const timeSinceLastSeen = currentTime - parcel.lastSeenTimestamp
+        const decayPeriods = Math.floor(timeSinceLastSeen / decayIntervalMs)
+        const newReward = Math.max(0, parcel.lastSeenReward - decayPeriods)
+
+        if (newReward <= 0) {
+          const posKey = `${parcel.x},${parcel.y}`
+          this.activeParcelPositions.delete(posKey)
+          this.parcels.delete(id)
+        } else if (newReward !== parcel.reward) {
+          parcel.reward = newReward
+        }
+      }
+    }
   }
 
   /**
@@ -97,8 +108,6 @@ class BeliefSet {
    */
   updateFromConfig(data: GameConfig) {
     this.config = data
-    // Restart decay timer with new interval if config changes
-    this.startDecayTimer()
   }
 
   /**
@@ -124,9 +133,7 @@ class BeliefSet {
         }
       }
     }
-    log.info(
-      `Map updated: ${data.width}x${data.height}. Delivery zones found: ${this.deliveryZones.length}`,
-    )
+    console.info(`Map updated: ${data.width}x${data.height}. Delivery zones found: ${this.deliveryZones.length}`)
   }
 
   /**
@@ -149,115 +156,46 @@ class BeliefSet {
 
     // Update parcels that are currently visible
     for (const p of parcelsData) {
-      // Remove parcels that have been picked up by someone
-      if (p.carriedBy !== null) {
-        this.parcels.delete(p.id)
-        continue
-      }
-
       this.parcels.set(p.id, {
         ...p,
         outdated: false,
         lastSeenTimestamp: currentTime,
+        lastSeenReward: p.reward,
       })
       seenParcels.add(p.id)
     }
 
-    // Mark parcels that are no longer visible as outdated and apply immediate decay
+    // Handle parcels not currently visible
     for (const [id, parcel] of this.parcels.entries()) {
       if (!seenParcels.has(id) && !parcel.outdated) {
-        // Check if the cell where this parcel was last seen is now empty
         const posKey = `${parcel.x},${parcel.y}`
-        const parcelsAtPosition = currentParcelPositions.get(posKey) || []
-
-        // If the cell is empty (no parcels at this position) or if the parcels'
-        // IDs don't contain the current parcel's ID, then remove the parcel comletely.
-        if (
-          parcelsAtPosition.length === 0 ||
-          !parcelsAtPosition.some((p) => p.id === id)
-        ) {
-          this.parcels.delete(id)
-          continue
-        }
-        const decayIntervalMs = parseTimeInterval(
-          this.config.PARCEL_DECADING_INTERVAL!,
-        )
-
-        // Calculate immediate decay (at least 1 decay period has passed)
-        const decayPeriods = decayIntervalMs > 0 ? 1 : 0
-        const newReward = Math.max(0, parcel.reward - decayPeriods)
-
-        if (newReward === 0) {
-          // Remove parcel immediately if reward becomes 0
-          this.parcels.delete(id)
+        if (currentParcelPositions.has(posKey)) {
+          // Position is sensed
+          const parcelsAtPosition = currentParcelPositions.get(posKey)!
+          if (!parcelsAtPosition.some((p) => p.id === id)) {
+            // Parcel not present in sensed position, assume picked up or gone
+            this.parcels.delete(id)
+            continue
+          }
         } else {
+          // Position not sensed, mark as outdated
           this.parcels.set(id, {
             ...parcel,
             outdated: true,
             lastSeenTimestamp: currentTime,
             lastSeenReward: parcel.reward,
-            reward: newReward,
           })
         }
       }
     }
-  }
 
-  /**
-   * Updates the rewards of outdated parcels based on decay
-   */
-  private updateOutdatedParcelRewards() {
-    const currentTime = Date.now()
-    const decayIntervalMs = parseTimeInterval(
-      this.config.PARCEL_DECADING_INTERVAL!,
-    )
-
-    if (decayIntervalMs <= 0) return
-
-    for (const [id, parcel] of this.parcels.entries()) {
-      if (
-        parcel.outdated &&
-        parcel.lastSeenTimestamp &&
-        parcel.lastSeenReward !== undefined
-      ) {
-        const timeSinceLastSeen = currentTime - parcel.lastSeenTimestamp
-        const decayPeriods = Math.floor(timeSinceLastSeen / decayIntervalMs)
-
-        // Apply decay starting from the last seen reward (linear decay)
-        const newReward = Math.max(0, parcel.lastSeenReward - decayPeriods)
-
-        if (newReward !== parcel.reward && newReward < parcel.reward) {
-          if (newReward === 0) {
-            // Remove parcel from belief set when reward reaches 0
-            this.parcels.delete(id)
-          } else {
-            this.parcels.set(id, {
-              ...parcel,
-              reward: newReward,
-            })
-          }
-        }
+    // Update active parcel positions for O(1) lookup
+    this.activeParcelPositions.clear()
+    for (const parcel of this.parcels.values()) {
+      if (!parcel.carriedBy && parcel.reward > 0) {
+        const posKey = `${parcel.x},${parcel.y}`
+        this.activeParcelPositions.add(posKey)
       }
-    }
-  }
-
-  /**
-   * Starts the decay timer to update outdated parcel rewards
-   */
-  private startDecayTimer() {
-    if (this.decayTimer) {
-      clearInterval(this.decayTimer)
-    }
-
-    // Parse the decay interval
-    const decayIntervalMs = parseTimeInterval(
-      this.config.PARCEL_DECADING_INTERVAL!,
-    )
-
-    if (decayIntervalMs > 0) {
-      this.decayTimer = setInterval(() => {
-        this.updateOutdatedParcelRewards()
-      }, decayIntervalMs)
     }
   }
 
@@ -283,15 +221,6 @@ class BeliefSet {
   }
 
   // ------------------------ Utility methods  ------------------------
-
-  /**
-   * Returns a specific parcel by its ID.
-   * @param {string} id - The ID of the parcel.
-   * @returns {ExtendedParcel | undefined}
-   */
-  getParcel(id: string): ExtendedParcel | undefined {
-    return this.parcels.get(id)
-  }
 
   /**
    * Determines if an agent is currently moving based on their coordinates
@@ -341,6 +270,45 @@ class BeliefSet {
    */
   clearCarryingParcels(): void {
     this.carrying = []
+  }
+
+  /**
+   * Checks if agent has any carrying parcels
+   * @returns {boolean} True if agent is carrying parcels
+   */
+  hasCarryingParcels(): boolean {
+    return this.carrying.length > 0
+  }
+
+  /**
+   * Checks if the agent is currently on a delivery tile.
+   * @returns {boolean} True if on a delivery tile, false otherwise.
+   */
+  isOnDeliveryTile(): boolean {
+    if (!this.me.x || !this.me.y || !this.grid.tiles) {
+      return false
+    }
+    const x = Math.floor(this.me.x)
+    const y = Math.floor(this.me.y)
+    const tile = this.grid.tiles[y][x]
+    return tile?.type === TileType.Delivery
+  }
+
+  /**
+   * Checks if the agent is currently on tile with an active parcel.
+   * @returns {boolean} True if on a tile with an active parcel, false otherwise.
+   */
+  isOnTileWithParcels(): boolean {
+    if (!this.me.x || !this.me.y || !this.grid.tiles) {
+      return false
+    }
+    const x = Math.floor(this.me.x)
+    const y = Math.floor(this.me.y)
+    if (y < 0 || y >= this.grid.height! || x < 0 || x >= this.grid.width!) {
+      return false
+    }
+    const posKey = `${x},${y}`
+    return this.activeParcelPositions.has(posKey)
   }
 }
 

@@ -1,8 +1,6 @@
-import Logger from '../utils/Logger.js'
 import { Grid, Point, TileType, Path, Heuristic, Move } from '../types/index.js'
 import { manhattanDistance } from '../utils/utils.js'
-
-const log = Logger('Pathfinder')
+import { beliefSet } from '../DeliverooDriver.js'
 
 // Helper function for a min-priority queue behavior
 class PriorityQueue<T> {
@@ -33,11 +31,7 @@ class Pathfinder {
    * @returns {Array<Path> | null} A sequence of moves ('up', 'down', 'left', 'right').
    */
 
-  getNode(
-    grid: Grid,
-    x: number,
-    y: number,
-  ): { x: number; y: number; type: TileType } | null {
+  private getNode(grid: Grid, x: number, y: number): { x: number; y: number; type: TileType } | null {
     if (x < 0 || x >= grid.width || y < 0 || y >= grid.height) {
       return null // Out of bounds
     }
@@ -48,7 +42,7 @@ class Pathfinder {
     return { x: x, y: y, type: grid.tiles[y][x].type } // Return tile type
   }
 
-  getNeighbors(currentNode: Point, grid: Grid): { point: Point; move: Move }[] {
+  private getNeighbors(currentNode: Point, grid: Grid): { point: Point; move: Move }[] {
     const directions = [
       { dx: 0, dy: 1, move: Move.UP },
       { dx: 0, dy: -1, move: Move.DOWN },
@@ -58,11 +52,7 @@ class Pathfinder {
     const neighbors: { point: Point; move: Move }[] = []
 
     for (const { dx, dy, move } of directions) {
-      const neighborNode = this.getNode(
-        grid,
-        currentNode.x + dx,
-        currentNode.y + dy,
-      )
+      const neighborNode = this.getNode(grid, currentNode.x + dx, currentNode.y + dy)
       if (neighborNode && neighborNode.type !== TileType.NonWalkable) {
         neighbors.push({
           point: { x: neighborNode.x, y: neighborNode.y },
@@ -74,30 +64,19 @@ class Pathfinder {
   }
 
   // Helper to create a unique string key for a point
-  pointToKey(point: Point): string {
+  private pointToKey(point: Point): string {
     return `${point.x},${point.y}`
   }
 
-  // Helper to convert a string key back to a point
-  keyToPoint(key: string): Point {
-    const parts = key.split(',').map(Number)
-    return { x: parts[0], y: parts[1] }
-  }
-
-  samePoint(p1: Point, p2: Point): boolean {
+  private samePoint(p1: Point, p2: Point): boolean {
     return p1.x === p2.x && p1.y === p2.y
   }
 
-  findPath(
-    grid: Grid,
-    start: Point,
-    goal: Point,
-    heuristic: Heuristic = manhattanDistance,
-  ): Path | null {
+  findPath(start: Point, goal: Point, heuristic: Heuristic = manhattanDistance): Path | null {
+    const grid = beliefSet.getGrid() as Grid
+
     if (!grid.tiles || !start || !goal) {
-      log.warn(
-        'findPath called with incomplete information (grid, start, or goal missing).',
-      )
+      console.warn('findPath called with incomplete information (grid, start, or goal missing).')
       return null // Not enough info
     }
 
@@ -106,15 +85,11 @@ class Pathfinder {
     const goalNode = this.getNode(grid, goal.x, goal.y)
 
     if (!startNode || startNode.type === TileType.NonWalkable) {
-      log.warn(
-        `Start point (${start.x}, ${start.y}) is non-walkable or out of bounds.`,
-      )
+      console.warn(`Start point (${start.x}, ${start.y}) is non-walkable or out of bounds.`)
       return null
     }
     if (!goalNode || goalNode.type === TileType.NonWalkable) {
-      log.warn(
-        `Goal point (${goal.x}, ${goal.y}) is non-walkable or out of bounds.`,
-      )
+      console.warn(`Goal point (${goal.x}, ${goal.y}) is non-walkable or out of bounds.`)
       return null
     }
     if (this.samePoint(start, goal)) {
@@ -140,9 +115,7 @@ class Pathfinder {
         while (!this.samePoint(tempCurrent, start)) {
           const prevInfo = previous.get(this.pointToKey(tempCurrent))
           if (!prevInfo) {
-            log.error(
-              'Path reconstruction error: no previous information found.',
-            )
+            console.error('Path reconstruction error: no previous information found.')
             return null
           }
           path.unshift(prevInfo.move)
@@ -168,7 +141,7 @@ class Pathfinder {
       }
     }
 
-    log.info('No path found (priority queue exhausted).')
+    console.info('No path found (priority queue exhausted).')
     return null
   }
 }
