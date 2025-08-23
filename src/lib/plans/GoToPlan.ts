@@ -12,7 +12,6 @@ export class GoToPlan extends Plan {
     if (this.stopped) throw ['stopped'] // if stopped then quit
 
     const me = beliefSet.getMe()
-    console.log('computing path')
     const path = pathFinder.findPath({ x: me.x!, y: me.y! }, predicate.destination)
 
     if (!path) {
