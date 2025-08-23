@@ -1,4 +1,4 @@
-import { Grid, Parcel, Point, TileType } from '../types/index.js'
+import { Grid, Parcel, Path, Point, TileType } from '../types/index.js'
 import { beliefSet, pathFinder } from '../DeliverooDriver.js'
 
 /**
@@ -13,14 +13,20 @@ export const manhattanDistance = (a: Point, b: Point): number => {
 /**
  * Finds the closest delivery zone to a given point.
  * @param point The point to find the closest delivery zone to.
- * @returns The closest delivery zone to the given point.
+ * @returns The closest delivery zone to the given point, along with the path to
+ * reach it.
  *
  * @todo it might be a better solution to pre-compute a map of the closest
  * delivery zone to each tile in the map such that to avoid useless re-computations
  * during the game.
+ * @todo we could also account for potential business in the delivery zone.
  */
-export function findClosestDeliveryZone(point: Point): Point {
+export function findClosestDeliveryZone(point: Point): {
+  deliveryZone: Point
+  path: Path
+} {
   let closestDeliveryZone: Point | null = null
+  let closestPath: Path | null = null
   let minDistance = Infinity
 
   const deliveryZones = beliefSet.getDeliveryZones()
@@ -35,15 +41,19 @@ export function findClosestDeliveryZone(point: Point): Point {
       if (path.cost < minDistance) {
         minDistance = path.cost
         closestDeliveryZone = deliveryZone
+        closestPath = path
       }
     }
   }
 
-  if (!closestDeliveryZone) {
+  if (!closestDeliveryZone || !closestPath) {
     throw new Error('No reachable delivery zone found')
   }
 
-  return closestDeliveryZone
+  return {
+    deliveryZone: closestDeliveryZone,
+    path: closestPath,
+  }
 }
 
 /**
@@ -101,18 +111,6 @@ export const getRandomWalkableTile = (): Point => {
 }
 
 /**
- * Mapper for parcel decading interval (game config. property).
- * Maps interval string to milliseconds.
- */
-export const parcelDecadingIntervalMapper: Record<string, number> = {
-  '1s': 1000,
-  '2s': 2000,
-  '5s': 5000,
-  '10s': 10000,
-  infinite: Infinity,
-} as const
-
-/**
  * Parses time interval strings like "10s", "1000ms" into milliseconds
  */
 export const parseTimeInterval = (interval: string) => {
@@ -139,19 +137,62 @@ export const parseTimeInterval = (interval: string) => {
 export const calculateParcelUtility = (
   parcel: Parcel,
   agentPos: Point,
-  totalCarriedReward: Number,
-  numCarriedParcels: Number,
-) => {
-  return -1
+  totalCarriedReward: number,
+  numCarriedParcels: number,
+): number => {
+  const decayIntervalMs = parseTimeInterval(beliefSet.getConfig().PARCEL_DECADING_INTERVAL!)
+  const movementDuration = beliefSet.getConfig().MOVEMENT_DURATION!
+  const pickupPath = pathFinder.findPath(agentPos, { x: parcel.x, y: parcel.y })
+  if (!pickupPath) return -Infinity
+  const closestDeliveryPath = findClosestDeliveryZone({ x: parcel.x, y: parcel.y }).path
+  if (!closestDeliveryPath) return -Infinity
+
+  // time to pickup and deliver the target parcel
+  const timeToPickup = pickupPath.cost * movementDuration
+  const timeToDeliver = closestDeliveryPath.cost * movementDuration
+  const totalTime = timeToPickup + timeToDeliver
+
+  // compute final total reward of currently carried parcels
+  let finalCarriedReward = totalCarriedReward
+  const decaysUntilPickup = Math.ceil(timeToPickup / decayIntervalMs) // carrying N parcels
+  const decaysUntilDelivery = Math.ceil(timeToDeliver / decayIntervalMs) // carrying N+1 parcels
+
+  if (numCarriedParcels > 0) {
+    finalCarriedReward -= decaysUntilPickup * numCarriedParcels
+    finalCarriedReward -= decaysUntilDelivery * (numCarriedParcels + 1)
+  }
+
+  // compute final reward of the target parcel
+  const threat = calculateParcelThreat(parcel)
+  const rewardAtPickup = parcel.reward - decaysUntilPickup - threat
+  const finalTargetReward = rewardAtPickup - decaysUntilDelivery * (numCarriedParcels + 1)
+
+  // final utility
+  const totalFinalReward = Math.max(0, finalCarriedReward) + Math.max(0, finalTargetReward)
+
+  return totalFinalReward / totalTime
 }
 
 export const calculateDeliveryUtility = (
   agentPos: Point,
-  totalCarriedReward: Number,
-  numCarriedParcels: Number,
-  closestDeliveryZone: Point,
-) => {
-  return -1
+  totalCarriedReward: number,
+  numCarriedParcels: number,
+): number => {
+  const closestDeliveryPath = findClosestDeliveryZone(agentPos).path
+  if (!closestDeliveryPath) return -Infinity
+
+  const decayIntervalMs = parseTimeInterval(beliefSet.getConfig().PARCEL_DECADING_INTERVAL!)
+  const movementDuration = beliefSet.getConfig().MOVEMENT_DURATION!
+  const timeToDeliver = closestDeliveryPath.cost * movementDuration
+
+  // compute decay that will occur during travel
+  const decays = Math.ceil(timeToDeliver / decayIntervalMs)
+  const totalDecayAmount = decays * numCarriedParcels
+
+  const finalReward = totalCarriedReward - totalDecayAmount
+
+  // --- 3. Compute Final Utility ---
+  return Math.max(0, finalReward) / timeToDeliver
 }
 
 /**
