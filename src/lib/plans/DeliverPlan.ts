@@ -1,6 +1,6 @@
 import { DesireType, Predicate } from '../../types/index.js'
 import { Plan } from './Plan.js'
-import { actionHandler as client } from '../../DeliverooDriver.js'
+import { beliefSet, actionHandler as client } from '../../DeliverooDriver.js'
 
 export class DeliverPlan extends Plan {
   static isApplicableTo(desire: DesireType) {
@@ -16,7 +16,10 @@ export class DeliverPlan extends Plan {
     })
 
     if (this.stopped) throw ['stopped'] // if stopped then quit
-    await client.drop()
+    const parcels = await client.drop()
+    if (parcels.length > 0) {
+      beliefSet.clearCarryingParcels()
+    }
     if (this.stopped) throw ['stopped'] // if stopped then quit
     return true
   }
