@@ -255,14 +255,17 @@ class BeliefSet {
   /**
    * Add parcels to the carrying array when pickup occurs
    */
-  addCarryingParcel(parcel: Parcel): void {
-    this.carrying.push({
-      id: parcel.id,
-      x: parcel.x,
-      y: parcel.y,
-      reward: parcel.reward,
-      carriedBy: this.me.id,
-    })
+  addCarryingParcel(parcelId: string): void {
+    const parcel = this.parcels.get(parcelId)
+    if (parcel) {
+      this.carrying.push({
+        id: parcelId,
+        x: parcel.x,
+        y: parcel.y,
+        reward: parcel.reward,
+        carriedBy: this.me.id,
+      })
+    }
   }
 
   /**
@@ -302,8 +305,8 @@ class BeliefSet {
     if (!this.me.x || !this.me.y || !this.grid.tiles) {
       return false
     }
-    const x = Math.floor(this.me.x)
-    const y = Math.floor(this.me.y)
+    const x = Math.round(this.me.x)
+    const y = Math.round(this.me.y)
     if (y < 0 || y >= this.grid.height! || x < 0 || x >= this.grid.width!) {
       return false
     }
