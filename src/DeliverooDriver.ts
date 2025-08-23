@@ -35,7 +35,6 @@ client.onConfig((config: GameConfig) => {
 
 client.onYou((data: { id: string; name: string; x: number; y: number; score: number }) => {
   beliefSet.updateFromYou(data)
-  generateOptions()
 })
 
 // this event is triggered once when the agent connects to the environment
@@ -60,7 +59,6 @@ client.onParcelsSensing(
     }[],
   ) => {
     beliefSet.updateFromParcels(parcels)
-    generateOptions()
   },
 )
 client.onAgentsSensing(
@@ -74,7 +72,6 @@ client.onAgentsSensing(
     }[],
   ) => {
     beliefSet.updateFromAgents(agents)
-    generateOptions()
   },
 )
 client.onConnect(() => console.log('Successfully connected and registered to the environment.'))
@@ -86,8 +83,6 @@ bdiAgent.loop()
 console.log('Agent is running and ready.')
 
 const generateOptions = () => {
-  const options: Predicate[] = []
-
   const me = beliefSet.getMe()
   const myPos = {
     x: Math.round(me.x!),
@@ -98,7 +93,7 @@ const generateOptions = () => {
   const closestDeliveryZone = findClosestDeliveryZone({
     x: Math.round(myPos.x),
     y: Math.round(myPos.y),
-  })
+  }).deliveryZone
   const isOnParcel = beliefSet.isOnTileWithParcels()
   const availableParcels = beliefSet.getParcels().filter((parcel) => {
     return !parcel.carriedBy && parcel.reward > 0
@@ -107,28 +102,32 @@ const generateOptions = () => {
   const totalCarriedReward = carriedParcels.reduce((acc, parcel) => acc + parcel.reward, 0)
   const numCarriedParcels = carriedParcels.length
   let bestParcel: Parcel | null = null
-  let maxUtility = Number.NEGATIVE_INFINITY
+  let maxUtility = -Infinity
 
-  // 1. If currently on a tile with a parcel, pick it up
+  // 1. If currently on a tile with a parcel, pick it up immediately
   if (isOnParcel) {
-    options.push({
+    bdiAgent.push({
       type: DesireType.PICKUP,
       destination: {
-        x: Math.floor(beliefSet.getMe().x!),
-        y: Math.floor(beliefSet.getMe().y!),
+        x: Math.round(beliefSet.getMe().x!),
+        y: Math.round(beliefSet.getMe().y!),
       },
-      utility: Number.POSITIVE_INFINITY, // forces to immediately stop the current intention and pick up the parcel
+      utility: Infinity,
     })
+    return
   }
 
-  // 2. Deliver all carried parcels (if any) if currently on a delivery zone
+  // 2. Deliver all carried parcels (if any) immediately if currently on a delivery zone
   if (isCarrying && isOnDeliveryTile) {
-    options.push({
+    bdiAgent.push({
       type: DesireType.DELIVER,
       destination: closestDeliveryZone,
-      utility: Number.POSITIVE_INFINITY, // forces to immediately stop the current intention and deliver the parcels
+      utility: Infinity,
     })
+    return
   }
+
+  const options: Predicate[] = []
 
   // 3. Generate all parcel options and choose the one with highest utility
   for (const parcel of availableParcels) {
@@ -141,8 +140,6 @@ const generateOptions = () => {
   }
 
   if (bestParcel) {
-    console.log(`Best parcel is '(${bestParcel?.x}, ${bestParcel?.y})' with utility: ${maxUtility}`)
-
     options.push({
       type: DesireType.PICKUP,
       destination: {
@@ -156,7 +153,7 @@ const generateOptions = () => {
 
   // 4. Generate delivery options
   if (isCarrying) {
-    const deliveryUtility = calculateDeliveryUtility(myPos, totalCarriedReward, numCarriedParcels, closestDeliveryZone)
+    const deliveryUtility = calculateDeliveryUtility(myPos, totalCarriedReward, numCarriedParcels)
 
     if (deliveryUtility > 0) {
       options.push({
@@ -170,18 +167,27 @@ const generateOptions = () => {
   // 5. Randomly Explore if no other option is available
   if (options.length === 0) {
     const randomPoint = getRandomWalkableTile()
-    options.push({
+    bdiAgent.push({
       type: DesireType.EXPLORATION,
       destination: randomPoint,
       utility: 0,
     })
+    return
   }
 
   if (options.length > 0) {
     options.sort((a, b) => b.utility - a.utility)
     const bestOption = options[0]
-    bdiAgent.push(bestOption)
+    const currentIntention = bdiAgent.currentIntention
+
+    if ((currentIntention && currentIntention.predicate.utility < bestOption.utility) || !currentIntention) {
+      bdiAgent.push(bestOption)
+    }
   }
 }
+
+setInterval(() => {
+  generateOptions()
+}, 50)
 
 export { actionHandler, beliefSet, pathFinder }
