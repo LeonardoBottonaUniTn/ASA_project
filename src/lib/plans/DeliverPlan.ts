@@ -19,6 +19,8 @@ export class DeliverPlan extends Plan {
     const parcels = await client.drop()
     if (parcels.length > 0) {
       beliefSet.clearCarryingParcels()
+      // Recompute partitioning after a successful delivery
+      beliefSet.updateMapPartitioning()
     }
     if (this.stopped) throw ['stopped'] // if stopped then quit
     return true

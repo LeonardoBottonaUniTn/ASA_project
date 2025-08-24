@@ -1,6 +1,6 @@
 // Main entry point for the Deliveroo BDI Agent
 
-import config from './config.js'
+import config, { GameMode } from './config.js'
 import { DeliverooApi } from '@unitn-asa/deliveroo-js-client'
 import BeliefSet from './lib/BeliefSet.js'
 import Pathfinder from './lib/Pathfinder.js'
@@ -11,7 +11,7 @@ import {
   calculateDeliveryUtility,
   calculateParcelUtility,
   findClosestDeliveryZone,
-  getRandomParcelGenerator,
+  getParcelGeneratorInAssignedArea,
 } from './utils/utils.js'
 
 console.log(`Deliveroo BDI Agent [${config.agent.name}] starting...`)
@@ -61,6 +61,7 @@ client.onParcelsSensing(
     beliefSet.updateFromParcels(parcels)
   },
 )
+
 client.onAgentsSensing(
   (
     agents: {
@@ -74,7 +75,9 @@ client.onAgentsSensing(
     beliefSet.updateFromAgents(agents)
   },
 )
+
 client.onConnect(() => console.log('Successfully connected and registered to the environment.'))
+
 client.onDisconnect(() => console.log('Disconnected from the environment.'))
 
 // 4. Kick off the main BDI loop
@@ -83,6 +86,7 @@ bdiAgent.loop()
 console.log('Agent is running and ready.')
 
 const generateOptions = () => {
+  const gameMode: GameMode = config.mode!
   const me = beliefSet.getMe()
   const myPos = {
     x: Math.round(me.x!),
@@ -95,9 +99,19 @@ const generateOptions = () => {
     y: Math.round(myPos.y),
   })?.deliveryZone
   const isOnParcel = beliefSet.isOnTileWithParcels()
+  const mapPartitioning = beliefSet.getMapPartitioning()
   const availableParcels = beliefSet.getParcels().filter((parcel) => {
-    return !parcel.carriedBy && parcel.reward > 0
-  }) // @todo when adding the multi-agent coordination, filters those parcels which are only in the area of the current agent
+    if (parcel.carriedBy || parcel.reward <= 0) {
+      return false
+    }
+    if (gameMode === GameMode.SingleAgent) {
+      return true
+    }
+    // In multi-agent mode, only pick up parcels assigned to this agent
+    const posKey = `${parcel.x},${parcel.y}`
+    const assignedAgent = mapPartitioning.get(posKey)
+    return assignedAgent === me.id
+  })
   const carriedParcels = beliefSet.getCarryingParcels()
   const totalCarriedReward = carriedParcels.reduce((acc, parcel) => acc + parcel.reward, 0)
   const numCarriedParcels = carriedParcels.length
@@ -166,12 +180,14 @@ const generateOptions = () => {
 
   // 5. Randomly Explore if no other option is available
   if (options.length === 0) {
-    const generator = getRandomParcelGenerator()
-    bdiAgent.push({
-      type: DesireType.EXPLORATION,
-      destination: generator,
-      utility: 0,
-    })
+    const generator = getParcelGeneratorInAssignedArea()
+    if (generator) {
+      bdiAgent.push({
+        type: DesireType.EXPLORATION,
+        destination: generator,
+        utility: 0,
+      })
+    }
     return
   }
 
@@ -187,7 +203,10 @@ const generateOptions = () => {
 }
 
 setInterval(() => {
+  if (beliefSet.getMapPartitioning().size === 0) {
+    beliefSet.updateMapPartitioning()
+  }
   generateOptions()
-}, 50)
+}, 1000)
 
 export { actionHandler, beliefSet, pathFinder }

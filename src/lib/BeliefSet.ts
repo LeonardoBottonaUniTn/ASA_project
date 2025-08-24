@@ -1,5 +1,5 @@
 import { Agent, Parcel, Grid, Point, TileType, GameConfig, ExtendedParcel } from '../types/index.js'
-import { computeLongestPath, parseTimeInterval } from '../utils/utils.js'
+import { computeLongestPath, computeParcelGeneratorPartitioning, parseTimeInterval } from '../utils/utils.js'
 
 class BeliefSet {
   private me: Partial<Agent> = {}
@@ -13,6 +13,7 @@ class BeliefSet {
   private activeParcelPositions: Set<string> = new Set()
   private occupiedPositions: Map<string, number> = new Map() // O(1) lookup for currently unavailable tiles using string keys
   private longestPathLength: number = 0 // longest path between strategic points on the map
+  private mapPartitioning: Map<string, string> = new Map() // generator tiles position to agent ID
 
   /**
    * Returns the current agent's state.
@@ -122,6 +123,14 @@ class BeliefSet {
   }
 
   /**
+   * Returns the Voronoi partitioning of parcel generators.
+   * @returns {Map<string, string>} A map from generator position key to agent ID.
+   */
+  getMapPartitioning(): Map<string, string> {
+    return this.mapPartitioning
+  }
+
+  /**
    * Updates the simulation config.
    * @param {GameConfig} data - Data from onConfig event.
    */
@@ -166,10 +175,22 @@ class BeliefSet {
   }
 
   /**
+   * Updates the Voronoi partitioning of parcel generators.
+   */
+  updateMapPartitioning() {
+    const newPartitioning = computeParcelGeneratorPartitioning()
+    console.info(`Map partitioning updated: ${this.mapPartitioning}`)
+    this.mapPartitioning = newPartitioning
+  }
+
+  /**
    * Updates the state of known parcels.
    * @param {Parcel[]} parcelsData - Data from onParcelsSensing event.
    */
   updateFromParcels(parcelsData: Parcel[]) {
+    // Detect if a new parcel has spawned before updating the belief set.
+    const newParcelSpawned = parcelsData.some((p) => !this.parcels.has(p.id))
+
     const seenParcels = new Set<string>()
     const currentTime = Date.now()
 
@@ -225,6 +246,11 @@ class BeliefSet {
         const posKey = `${parcel.x},${parcel.y}`
         this.activeParcelPositions.add(posKey)
       }
+    }
+
+    // If a new parcel was detected, recompute the partitioning.
+    if (newParcelSpawned) {
+      this.updateMapPartitioning()
     }
   }
 

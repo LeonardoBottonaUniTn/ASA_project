@@ -1,4 +1,4 @@
-import { Grid, Parcel, Path, Point, TileType } from '../types/index.js'
+import { Agent, Grid, Parcel, Path, Point, TileType } from '../types/index.js'
 import { beliefSet, pathFinder } from '../DeliverooDriver.js'
 
 /**
@@ -92,20 +92,6 @@ export function printGrid(grid: Grid): void {
 
   gridString += '└' + '─'.repeat(grid.width * 2 + 1) + '┘'
   console.log(`Grid:\n${gridString}`)
-}
-
-/**
- * Returns the position of a random tile able to generate parcels.
- *
- * @todo avoid returning those tiles already occupied by other agents.
- *
- * @returns {Point} A random tile able to generate parcels.
- */
-export const getRandomParcelGenerator = (): Point => {
-  const parcelGenerators = beliefSet.getParcelGenerators()
-
-  const randomIndex = Math.floor(Math.random() * parcelGenerators.length)
-  return parcelGenerators[randomIndex]
 }
 
 /**
@@ -312,4 +298,75 @@ export function computeLongestPath(): number {
 
   console.info(`Computed longest path: ${longestPath}`)
   return longestPath
+}
+
+/**
+ * Returns a random parcel generator from the agent's assigned Voronoi region.
+ * This is used for exploration when the agent is idle.
+ * @returns {Point | null} A random parcel generator point, or null if none are assigned.
+ */
+export function getParcelGeneratorInAssignedArea(): Point | null {
+  const me = beliefSet.getMe()
+  if (!me.id) return null
+
+  const partitioning = beliefSet.getMapPartitioning()
+  const myGenerators: Point[] = []
+
+  for (const [generatorKey, agentId] of partitioning.entries()) {
+    if (agentId === me.id) {
+      const [x, y] = generatorKey.split(',').map(Number)
+      myGenerators.push({ x, y })
+    }
+  }
+
+  if (myGenerators.length === 0) {
+    return null
+  }
+
+  const randomIndex = Math.floor(Math.random() * myGenerators.length)
+  return myGenerators[randomIndex]
+}
+
+/**
+ * Computes the Voronoi-based partitioning of parcel generators among all agents.
+ * Each generator is assigned to the nearest agent based on shortest-path distance.
+ * This method is called when the partitioning needs to be updated,
+ * e.g., when a new parcel spawns or a delivery is completed.
+ * @returns A Map where keys are generator coordinates ("x,y") and values are agent IDs
+ */
+export function computeParcelGeneratorPartitioning(): Map<string, string> {
+  const generators = beliefSet.getParcelGenerators()
+  const me = beliefSet.getMe()
+  // @todo only partition with the friendly agent, not all of the other agents
+  const otherAgents = Array.from(beliefSet.getOtherAgents().values())
+  const allAgents = [me, ...otherAgents].filter((a) => a.id != null) as Agent[]
+
+  const partitioning = new Map<string, string>()
+
+  if (allAgents.length === 0 || generators.length === 0) {
+    return partitioning
+  }
+
+  for (const generator of generators) {
+    let bestAgentId: string | null = null
+    let minDistance = Infinity
+
+    for (const agent of allAgents) {
+      const path = pathFinder.findPath({ x: Math.round(agent.x), y: Math.round(agent.y) }, generator)
+      const distance = path?.cost
+
+      if (distance && distance <= minDistance) {
+        minDistance = distance
+        bestAgentId = agent.id
+      }
+    }
+
+    if (bestAgentId) {
+      const generatorKey = `${generator.x},${generator.y}`
+      partitioning.set(generatorKey, bestAgentId)
+    }
+  }
+
+  console.info('Computed parcel generator partitioning.', partitioning)
+  return partitioning
 }

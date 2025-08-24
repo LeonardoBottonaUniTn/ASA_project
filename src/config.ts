@@ -5,6 +5,11 @@ dotenv.config({
   path: path.resolve(process.cwd(), '.env'),
 })
 
+export enum GameMode {
+  SingleAgent = 'single-agent',
+  CoOp = 'co-op',
+}
+
 interface Config {
   api: {
     host: string
@@ -13,6 +18,7 @@ interface Config {
   agent: {
     name: string
   }
+  mode: GameMode
 }
 
 const config: Config = {
@@ -26,6 +32,7 @@ const config: Config = {
   agent: {
     name: 'BDI-Agent-007',
   },
+  mode: GameMode.SingleAgent,
 }
 
 export default config
