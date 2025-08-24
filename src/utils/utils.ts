@@ -118,6 +118,23 @@ export const parseTimeInterval = (interval: string) => {
   }
 }
 
+/**
+ * Calculates the utility value of picking up a specific parcel, accounting for:
+ * - Time needed to pickup and deliver the parcel
+ * - Reward decay of currently carried parcels during travel
+ * - Reward decay of the target parcel
+ * - Threat level from other agents
+ *
+ * The utility is calculated as: (final total reward) / (total time needed)
+ * where final total reward includes both carried parcels and target parcel
+ * after accounting for all decay periods.
+ *
+ * @param parcel - The parcel to evaluate
+ * @param agentPos - Current position of the agent
+ * @param totalCarriedReward - Sum of rewards of all carried parcels
+ * @param numCarriedParcels - Number of parcels currently being carried
+ * @returns Utility value (reward/time) for picking up the parcel, or -Infinity if unreachable
+ */
 export const calculateParcelUtility = (
   parcel: Parcel,
   agentPos: Point,
@@ -157,6 +174,17 @@ export const calculateParcelUtility = (
   return totalFinalReward / totalTime
 }
 
+/**
+ * Calculates the utility value of delivering currently carried parcels to the closest delivery zone.
+ *
+ * The utility is calculated as the final reward divided by the time needed to deliver,
+ * accounting for reward decay during travel time.
+ *
+ * @param agentPos - Current position of the agent
+ * @param totalCarriedReward - Sum of rewards of all carried parcels
+ * @param numCarriedParcels - Number of parcels currently being carried
+ * @returns Utility value (reward/time) for delivering parcels, or -Infinity if no delivery zone is reachable
+ */
 export const calculateDeliveryUtility = (
   agentPos: Point,
   totalCarriedReward: number,
