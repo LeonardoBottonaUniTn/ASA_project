@@ -20,6 +20,7 @@
   "homepage": "https://github.com/LeonardoBottonaUniTn/ASA_project#readme",
   "dependencies": {
     "@unitn-asa/deliveroo-js-client": "^2.0.3",
+    "@unitn-asa/pddl-client": "^1.6.2",
     "dotenv": "^16.5.0",
     "uuid": "^11.1.0"
   },

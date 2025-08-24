@@ -19,6 +19,7 @@ interface Config {
     name: string
   }
   mode: GameMode
+  usePddl: boolean
 }
 
 const config: Config = {
@@ -33,6 +34,7 @@ const config: Config = {
     name: 'BDI-Agent-007',
   },
   mode: GameMode.SingleAgent,
+  usePddl: true, // use PDDL to generate plans
 }
 
 export default config

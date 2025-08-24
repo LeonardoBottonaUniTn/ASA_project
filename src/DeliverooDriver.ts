@@ -207,6 +207,6 @@ setInterval(() => {
     beliefSet.updateMapPartitioning()
   }
   generateOptions()
-}, 1000)
+}, 5000)
 
 export { actionHandler, beliefSet, pathFinder }

@@ -2,13 +2,19 @@ import { Predicate } from '../types/index.js'
 import { PickUpPlan } from './plans/PickUpPlan.js'
 import { DeliverPlan } from './plans/DeliverPlan.js'
 import { GoToPlan } from './plans/GoToPlan.js'
+import { PddlMove } from './plans/GoToPlanPddl.js'
 import { Plan } from './plans/Plan.js'
+import config from '../config.js'
 
 const planLibrary: (typeof Plan)[] = []
 
 planLibrary.push(PickUpPlan)
 planLibrary.push(DeliverPlan)
-planLibrary.push(GoToPlan)
+if (config.usePddl) {
+  planLibrary.push(PddlMove)
+} else {
+  planLibrary.push(GoToPlan)
+}
 
 /**
  * Intention

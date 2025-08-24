@@ -1,7 +1,7 @@
 import { Agent, Parcel, Grid, Point, TileType, GameConfig, ExtendedParcel } from '../types/index.js'
 import { computeLongestPath, computeParcelGeneratorPartitioning, parseTimeInterval } from '../utils/utils.js'
 
-class BeliefSet {
+export class BeliefSet {
   private me: Partial<Agent> = {}
   private carrying: Parcel[] = []
   private grid: Partial<Grid> = {}
@@ -179,7 +179,7 @@ class BeliefSet {
    */
   updateMapPartitioning() {
     const newPartitioning = computeParcelGeneratorPartitioning()
-    console.info(`Map partitioning updated: ${this.mapPartitioning}`)
+    console.info('Map partitioning updated:', newPartitioning)
     this.mapPartitioning = newPartitioning
   }
 
