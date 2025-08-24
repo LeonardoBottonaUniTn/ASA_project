@@ -24,7 +24,7 @@ export const manhattanDistance = (a: Point, b: Point): number => {
 export function findClosestDeliveryZone(point: Point): {
   deliveryZone: Point
   path: Path
-} {
+} | null {
   let closestDeliveryZone: Point | null = null
   let closestPath: Path | null = null
   let minDistance = Infinity
@@ -32,7 +32,7 @@ export function findClosestDeliveryZone(point: Point): {
   const deliveryZones = beliefSet.getDeliveryZones()
 
   if (deliveryZones.length === 0) {
-    throw new Error('No delivery zones found in the grid')
+    return null
   }
 
   for (const deliveryZone of deliveryZones) {
@@ -47,7 +47,8 @@ export function findClosestDeliveryZone(point: Point): {
   }
 
   if (!closestDeliveryZone || !closestPath) {
-    throw new Error('No reachable delivery zone found')
+    console.warn('No reachable delivery zone found')
+    return null
   }
 
   return {
@@ -141,7 +142,7 @@ export const calculateParcelUtility = (
   const movementDuration = beliefSet.getConfig().MOVEMENT_DURATION!
   const pickupPath = pathFinder.findPath(agentPos, { x: parcel.x, y: parcel.y })
   if (!pickupPath) return -Infinity
-  const closestDeliveryPath = findClosestDeliveryZone({ x: parcel.x, y: parcel.y }).path
+  const closestDeliveryPath = findClosestDeliveryZone({ x: parcel.x, y: parcel.y })?.path
   if (!closestDeliveryPath) return -Infinity
 
   // time to pickup and deliver the target parcel
@@ -175,7 +176,7 @@ export const calculateDeliveryUtility = (
   totalCarriedReward: number,
   numCarriedParcels: number,
 ): number => {
-  const closestDeliveryPath = findClosestDeliveryZone(agentPos).path
+  const closestDeliveryPath = findClosestDeliveryZone(agentPos)?.path
   if (!closestDeliveryPath) return -Infinity
 
   const decayIntervalMs = parseTimeInterval(beliefSet.getConfig().PARCEL_DECADING_INTERVAL!)
@@ -282,4 +283,33 @@ export function calculateParcelThreat(parcel: Parcel): number {
   }
 
   return totalThreat
+}
+
+/**
+ * Computes the longest path between any two strategic points on the map
+ * (parcel generators and delivery zones).
+ * @returns {number} The length of the longest path found.
+ */
+export function computeLongestPath(): number {
+  const parcelGenerators = beliefSet.getParcelGenerators()
+  const deliveryZones = beliefSet.getDeliveryZones()
+  const strategicPoints = [...parcelGenerators, ...deliveryZones]
+
+  let longestPath = 0
+
+  if (strategicPoints.length < 2) {
+    return 0
+  }
+
+  for (let i = 0; i < strategicPoints.length; i++) {
+    for (let j = i + 1; j < strategicPoints.length; j++) {
+      const path = pathFinder.findPath(strategicPoints[i], strategicPoints[j])
+      if (path && path.cost > longestPath) {
+        longestPath = path.cost
+      }
+    }
+  }
+
+  console.info(`Computed longest path: ${longestPath}`)
+  return longestPath
 }

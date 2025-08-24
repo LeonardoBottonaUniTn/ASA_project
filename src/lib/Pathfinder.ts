@@ -50,10 +50,16 @@ class Pathfinder {
       { dx: 1, dy: 0, move: Move.RIGHT },
     ]
     const neighbors: { point: Point; move: Move }[] = []
+    const occupiedPositions = beliefSet.getOccupiedPositions()
 
     for (const { dx, dy, move } of directions) {
       const neighborNode = this.getNode(grid, currentNode.x + dx, currentNode.y + dy)
-      if (neighborNode && neighborNode.type !== TileType.NonWalkable) {
+
+      if (
+        neighborNode &&
+        neighborNode.type !== TileType.NonWalkable &&
+        !occupiedPositions.has(`${neighborNode.x},${neighborNode.y}`)
+      ) {
         neighbors.push({
           point: { x: neighborNode.x, y: neighborNode.y },
           move,
@@ -83,13 +89,14 @@ class Pathfinder {
     // Check if start or goal are non-walkable or out of bounds
     const startNode = this.getNode(grid, start.x, start.y)
     const goalNode = this.getNode(grid, goal.x, goal.y)
+    const occupiedPositions = beliefSet.getOccupiedPositions()
 
-    if (!startNode || startNode.type === TileType.NonWalkable) {
-      console.warn(`Start point (${start.x}, ${start.y}) is non-walkable or out of bounds.`)
+    if (!startNode || startNode.type === TileType.NonWalkable || occupiedPositions.has(`${start.x},${start.y}`)) {
+      console.warn(`Start point (${start.x}, ${start.y}) is non-walkable, occupied by another agent or out of bounds.`)
       return null
     }
-    if (!goalNode || goalNode.type === TileType.NonWalkable) {
-      console.warn(`Goal point (${goal.x}, ${goal.y}) is non-walkable or out of bounds.`)
+    if (!goalNode || goalNode.type === TileType.NonWalkable || occupiedPositions.has(`${goal.x},${goal.y}`)) {
+      console.warn(`Goal point (${goal.x}, ${goal.y}) is non-walkable, occupied by another agent or out of bounds.`)
       return null
     }
     if (this.samePoint(start, goal)) {

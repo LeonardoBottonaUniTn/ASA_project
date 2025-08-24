@@ -93,7 +93,7 @@ const generateOptions = () => {
   const closestDeliveryZone = findClosestDeliveryZone({
     x: Math.round(myPos.x),
     y: Math.round(myPos.y),
-  }).deliveryZone
+  })?.deliveryZone
   const isOnParcel = beliefSet.isOnTileWithParcels()
   const availableParcels = beliefSet.getParcels().filter((parcel) => {
     return !parcel.carriedBy && parcel.reward > 0
@@ -118,7 +118,7 @@ const generateOptions = () => {
   }
 
   // 2. Deliver all carried parcels (if any) immediately if currently on a delivery zone
-  if (isCarrying && isOnDeliveryTile) {
+  if (isCarrying && isOnDeliveryTile && closestDeliveryZone) {
     bdiAgent.push({
       type: DesireType.DELIVER,
       destination: closestDeliveryZone,
@@ -152,7 +152,7 @@ const generateOptions = () => {
   }
 
   // 4. Generate delivery options
-  if (isCarrying) {
+  if (isCarrying && closestDeliveryZone) {
     const deliveryUtility = calculateDeliveryUtility(myPos, totalCarriedReward, numCarriedParcels)
 
     if (deliveryUtility > 0) {

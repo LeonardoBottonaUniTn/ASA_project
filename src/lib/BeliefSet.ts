@@ -1,5 +1,5 @@
 import { Agent, Parcel, Grid, Point, TileType, GameConfig, ExtendedParcel } from '../types/index.js'
-import { parseTimeInterval } from '../utils/utils.js'
+import { computeLongestPath, parseTimeInterval } from '../utils/utils.js'
 
 class BeliefSet {
   private me: Partial<Agent> = {}
@@ -11,6 +11,8 @@ class BeliefSet {
   private otherAgents: Map<string, Agent> = new Map()
   private config: Partial<GameConfig> = {}
   private activeParcelPositions: Set<string> = new Set()
+  private occupiedPositions: Map<string, number> = new Map() // O(1) lookup for currently unavailable tiles using string keys
+  private longestPathLength: number = 0 // longest path between strategic points on the map
 
   /**
    * Returns the current agent's state.
@@ -112,6 +114,14 @@ class BeliefSet {
   }
 
   /**
+   * Returns the map of occupied positions along with their last seen occupation timestamp
+   * @returns {Map<string, number>}
+   */
+  getOccupiedPositions(): Map<string, number> {
+    return this.occupiedPositions
+  }
+
+  /**
    * Updates the simulation config.
    * @param {GameConfig} data - Data from onConfig event.
    */
@@ -150,6 +160,9 @@ class BeliefSet {
     console.info(
       `Map updated: ${data.width}x${data.height}. Delivery zones found: ${this.deliveryZones.length}. Parcel generators found: ${this.parcelGenerators.length}`,
     )
+
+    // Pre-compute the longest path on the map
+    this.longestPathLength = computeLongestPath()
   }
 
   /**
@@ -221,17 +234,39 @@ class BeliefSet {
    */
   updateFromAgents(data: Agent[]) {
     const seenAgents = new Set<string>()
+    const now = Date.now()
+
     for (const agent of data) {
       if (agent.id !== this.me.id) {
+        // If we've seen this agent before, remove its old position from the occupied map.
+        if (this.otherAgents.has(agent.id)) {
+          const oldAgent = this.otherAgents.get(agent.id)!
+          const oldPosKey = `${Math.round(oldAgent.x)},${Math.round(oldAgent.y)}`
+          this.occupiedPositions.delete(oldPosKey)
+        }
+
+        const posKey = `${Math.round(agent.x)},${Math.round(agent.y)}`
         this.otherAgents.set(agent.id, agent)
+        this.occupiedPositions.set(posKey, now)
         seenAgents.add(agent.id)
       }
     }
 
     // Remove agents that are no longer visible
-    for (const id of this.otherAgents.keys()) {
+    for (const id of Array.from(this.otherAgents.keys())) {
       if (!seenAgents.has(id)) {
         this.otherAgents.delete(id)
+      }
+    }
+
+    // Cleanup very old timestamps so the map doesn't grow forever. The forget
+    // time is an estimate set as the time it takes for an agent to move along
+    // the longest path on the map.
+    const forgetMs = this.longestPathLength * this.config.MOVEMENT_DURATION!
+
+    for (const [posKey, ts] of this.occupiedPositions.entries()) {
+      if (now - ts > forgetMs) {
+        this.occupiedPositions.delete(posKey)
       }
     }
   }
