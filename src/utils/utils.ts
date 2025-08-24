@@ -58,9 +58,7 @@ export function findClosestDeliveryZone(point: Point): {
 
 /**
  * Generates a random grid with the given width, height, and density.
- * @param width - The width of the grid.
- * @param height - The height of the grid.
- * @param density - The density of the grid.
+ 
  * @returns The generated grid.
  */
 export function printGrid(grid: Grid): void {
@@ -74,6 +72,9 @@ export function printGrid(grid: Grid): void {
       switch (tile.type) {
         case TileType.NonWalkable:
           row += '█'
+          break
+        case TileType.ParcelGenerator:
+          row += 'P'
           break
         case TileType.Walkable:
           row += '·'
@@ -89,25 +90,21 @@ export function printGrid(grid: Grid): void {
   }
 
   gridString += '└' + '─'.repeat(grid.width * 2 + 1) + '┘'
-  // console.log(`Grid:\n${gridString}`)
+  console.log(`Grid:\n${gridString}`)
 }
 
 /**
- * Returns a random walkable tile from the grid.
+ * Returns the position of a random tile able to generate parcels.
  *
- * @returns {Point} A random walkable tile.
+ * @todo avoid returning those tiles already occupied by other agents.
+ *
+ * @returns {Point} A random tile able to generate parcels.
  */
-export const getRandomWalkableTile = (): Point => {
-  const grid = beliefSet.getGrid() as Grid
+export const getRandomParcelGenerator = (): Point => {
+  const parcelGenerators = beliefSet.getParcelGenerators()
 
-  while (true) {
-    const x = Math.floor(Math.random() * grid.width)
-    const y = Math.floor(Math.random() * grid.height)
-
-    if (grid.tiles[y][x].type === TileType.Walkable) {
-      return { x, y }
-    }
-  }
+  const randomIndex = Math.floor(Math.random() * parcelGenerators.length)
+  return parcelGenerators[randomIndex]
 }
 
 /**

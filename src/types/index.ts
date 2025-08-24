@@ -23,8 +23,9 @@ export interface ExtendedParcel extends Parcel {
 
 export enum TileType {
   NonWalkable = 0,
-  Walkable = 1,
+  ParcelGenerator = 1,
   Delivery = 2,
+  Walkable = 3,
 }
 
 export interface Tile {

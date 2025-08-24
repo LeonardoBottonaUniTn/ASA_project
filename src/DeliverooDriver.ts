@@ -6,12 +6,12 @@ import BeliefSet from './lib/BeliefSet.js'
 import Pathfinder from './lib/Pathfinder.js'
 import Agent from './lib/BDIAgent.js'
 import ActionHandler from './lib/ActionHandler.js'
-import { DesireType, GameConfig, Parcel, Point, Predicate, TileType } from './types/index.js'
+import { DesireType, GameConfig, Parcel, Predicate, TileType } from './types/index.js'
 import {
   calculateDeliveryUtility,
   calculateParcelUtility,
   findClosestDeliveryZone,
-  getRandomWalkableTile,
+  getRandomParcelGenerator,
 } from './utils/utils.js'
 
 console.log(`Deliveroo BDI Agent [${config.agent.name}] starting...`)
@@ -166,10 +166,10 @@ const generateOptions = () => {
 
   // 5. Randomly Explore if no other option is available
   if (options.length === 0) {
-    const randomPoint = getRandomWalkableTile()
+    const generator = getRandomParcelGenerator()
     bdiAgent.push({
       type: DesireType.EXPLORATION,
-      destination: randomPoint,
+      destination: generator,
       utility: 0,
     })
     return

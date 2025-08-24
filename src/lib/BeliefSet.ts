@@ -7,6 +7,7 @@ class BeliefSet {
   private grid: Partial<Grid> = {}
   private parcels: Map<string, ExtendedParcel> = new Map()
   private deliveryZones: Point[] = []
+  private parcelGenerators: Point[] = []
   private otherAgents: Map<string, Agent> = new Map()
   private config: Partial<GameConfig> = {}
   private activeParcelPositions: Set<string> = new Set()
@@ -95,6 +96,14 @@ class BeliefSet {
   }
 
   /**
+   * Returns the list of tiles which are able to generate parcels.
+   * @returns {Point[]}
+   */
+  getParcelGenerators(): Point[] {
+    return this.parcelGenerators
+  }
+
+  /**
    * Returns the current simulation config.
    * @returns {Partial<GameConfig>}
    */
@@ -124,16 +133,23 @@ class BeliefSet {
    */
   updateFromMap(data: Grid) {
     this.grid = data
-    // Find delivery zones from the map tiles
+    // Find delivery zones and tiles which generate parcels from the map tiles
     this.deliveryZones = []
+    this.parcelGenerators = []
+
     for (let i = 0; i < data.height; i++) {
       for (let j = 0; j < data.width; j++) {
         if (data.tiles[i][j]?.type === TileType.Delivery) {
           this.deliveryZones.push({ x: j, y: i })
         }
+        if (data.tiles[i][j]?.type === TileType.ParcelGenerator) {
+          this.parcelGenerators.push({ x: j, y: i })
+        }
       }
     }
-    console.info(`Map updated: ${data.width}x${data.height}. Delivery zones found: ${this.deliveryZones.length}`)
+    console.info(
+      `Map updated: ${data.width}x${data.height}. Delivery zones found: ${this.deliveryZones.length}. Parcel generators found: ${this.parcelGenerators.length}`,
+    )
   }
 
   /**
