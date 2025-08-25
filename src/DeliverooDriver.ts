@@ -88,17 +88,21 @@ console.log('Agent is running and ready.')
 const generateOptions = () => {
   const gameMode: GameMode = config.mode!
   const me = beliefSet.getMe()
+  if (!me || me.x === undefined || me.y === undefined) {
+    return
+  }
+  const currentIntention = bdiAgent.currentIntention
   const myPos = {
-    x: Math.round(me.x!),
-    y: Math.round(me.y!),
+    x: Math.round(me.x),
+    y: Math.round(me.y),
   }
   const isCarrying = beliefSet.hasCarryingParcels()
-  const isOnDeliveryTile = beliefSet.isOnDeliveryTile()
+  const sittingOnDeliveryTile = beliefSet.isOnDeliveryTile()
   const closestDeliveryZone = findClosestDeliveryZone({
     x: Math.round(myPos.x),
     y: Math.round(myPos.y),
   })?.deliveryZone
-  const isOnParcel = beliefSet.isOnTileWithParcels()
+  const sittingOnParcelId = beliefSet.getParcelIdAtCurrentPosition()
   const mapPartitioning = beliefSet.getMapPartitioning()
   const availableParcels = beliefSet.getParcels().filter((parcel) => {
     if (parcel.carriedBy || parcel.reward <= 0) {
@@ -118,21 +122,30 @@ const generateOptions = () => {
   let bestParcel: Parcel | null = null
   let maxUtility = -Infinity
 
-  // 1. If currently on a tile with a parcel, pick it up immediately
-  if (isOnParcel) {
+  // 1. If currently on a tile with a parcel, pick it up immediately (if parcel
+  //    wasn't already as the target of the current intention)
+  if (sittingOnParcelId != null && currentIntention?.predicate.parcel_id !== sittingOnParcelId) {
     bdiAgent.push({
       type: DesireType.PICKUP,
       destination: {
-        x: Math.round(beliefSet.getMe().x!),
-        y: Math.round(beliefSet.getMe().y!),
+        x: Math.round(me.x),
+        y: Math.round(me.y),
       },
       utility: Infinity,
+      parcel_id: sittingOnParcelId,
     })
     return
   }
 
-  // 2. Deliver all carried parcels (if any) immediately if currently on a delivery zone
-  if (isCarrying && isOnDeliveryTile && closestDeliveryZone) {
+  // 2. Deliver all carried parcels (if any) immediately if currently on a
+  //    delivery zone and that delivery zone is not the current intention.
+  if (
+    isCarrying &&
+    sittingOnDeliveryTile != null &&
+    closestDeliveryZone &&
+    currentIntention?.predicate.destination.x !== sittingOnDeliveryTile.x &&
+    currentIntention?.predicate.destination.y !== sittingOnDeliveryTile.y
+  ) {
     bdiAgent.push({
       type: DesireType.DELIVER,
       destination: closestDeliveryZone,

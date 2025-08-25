@@ -10,7 +10,7 @@ export class BeliefSet {
   private parcelGenerators: Point[] = []
   private otherAgents: Map<string, Agent> = new Map()
   private config: Partial<GameConfig> = {}
-  private activeParcelPositions: Set<string> = new Set()
+  private activeParcelPositions: Map<string, string> = new Map() // position to parcel ID
   private occupiedPositions: Map<string, number> = new Map() // O(1) lookup for currently unavailable tiles using string keys
   private longestPathLength: number = 0 // longest path between strategic points on the map
   private mapPartitioning: Map<string, string> = new Map() // generator tiles position to agent ID
@@ -244,7 +244,7 @@ export class BeliefSet {
     for (const parcel of this.parcels.values()) {
       if (!parcel.carriedBy && parcel.reward > 0) {
         const posKey = `${parcel.x},${parcel.y}`
-        this.activeParcelPositions.add(posKey)
+        this.activeParcelPositions.set(posKey, parcel.id)
       }
     }
 
@@ -362,33 +362,33 @@ export class BeliefSet {
 
   /**
    * Checks if the agent is currently on a delivery tile.
-   * @returns {boolean} True if on a delivery tile, false otherwise.
+   * @returns {Point | null} The position of the delivery tile if on a delivery tile, null otherwise.
    */
-  isOnDeliveryTile(): boolean {
+  isOnDeliveryTile(): Point | null {
     if (!this.me.x || !this.me.y || !this.grid.tiles) {
-      return false
+      return null
     }
     const x = Math.floor(this.me.x)
     const y = Math.floor(this.me.y)
     const tile = this.grid.tiles[y][x]
-    return tile?.type === TileType.Delivery
+    return tile?.type === TileType.Delivery ? { x, y } : null
   }
 
   /**
-   * Checks if the agent is currently on tile with an active parcel.
-   * @returns {boolean} True if on a tile with an active parcel, false otherwise.
+   * Checks if the agent is currently on tile with an active parcel and returns the parcel id.
+   * @returns {string} The id of the active parcel at the current position, or false if no active parcel is found.
    */
-  isOnTileWithParcels(): boolean {
+  getParcelIdAtCurrentPosition(): string | null {
     if (!this.me.x || !this.me.y || !this.grid.tiles) {
-      return false
+      return null
     }
     const x = Math.round(this.me.x)
     const y = Math.round(this.me.y)
     if (y < 0 || y >= this.grid.height! || x < 0 || x >= this.grid.width!) {
-      return false
+      return null
     }
     const posKey = `${x},${y}`
-    return this.activeParcelPositions.has(posKey)
+    return this.activeParcelPositions.get(posKey) || null
   }
 }
 

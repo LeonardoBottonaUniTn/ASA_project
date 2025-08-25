@@ -15,6 +15,13 @@ export class PddlMove extends Plan {
   async execute(predicate: Predicate): Promise<boolean> {
     if (this.stopped) throw ['stopped'] // if stopped then quit
 
+    // Check if already at destination
+    const me = beliefSet.getMe()
+    const myPos = { x: Math.round(me.x!), y: Math.round(me.y!) }
+    if (myPos.x === predicate.destination.x && myPos.y === predicate.destination.y) {
+      return true // already at destination
+    }
+
     const pddlProblemGenerator = new PddlProblem(beliefSet)
     const problem = pddlProblemGenerator.generatePddlProblem(predicate.destination)
 
@@ -24,11 +31,6 @@ export class PddlMove extends Plan {
     const plan = await onlineSolver(domain, problem)
 
     if (!plan || plan.length === 0) {
-      const me = beliefSet.getMe()
-      const myPos = { x: Math.round(me.x!), y: Math.round(me.y!) }
-      if (myPos.x === predicate.destination.x && myPos.y === predicate.destination.y) {
-        return true // already at destination
-      }
       throw ['no plan found']
     }
 
