@@ -5,13 +5,38 @@ import { DesireType, Predicate } from '../types/index.js'
 export class BDI_Agent {
   #intentionQueue: Intention[] = new Array<Intention>()
   #onQueueEmpty: (() => void) | null = null
+  #handshakeComplete: boolean = false
+  #teammateId: string | null = null
+  #sessionId: string | null = null
 
-  get intentionQueue() {
+  get intentionQueue(): Intention[] {
     return this.#intentionQueue
   }
 
-  get currentIntention() {
+  get currentIntention(): Intention | undefined {
     return this.#intentionQueue[0]
+  }
+
+  get handshakeComplete(): boolean {
+    return this.#handshakeComplete
+  }
+
+  get teammateId(): string | null {
+    return this.#teammateId
+  }
+
+  get sessionId(): string | null {
+    return this.#sessionId
+  }
+
+  setHandshake(teammateId: string, sessionId: string): void {
+    this.#teammateId = teammateId
+    this.#sessionId = sessionId
+    this.#handshakeComplete = true
+  }
+
+  set handshakeComplete(value: boolean) {
+    this.#handshakeComplete = value
   }
 
   /**

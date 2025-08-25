@@ -33,6 +33,7 @@ class ActionHandler {
   async drop(): Promise<{ id: string }[]> {
     return await this.api.emitPutdown()
   }
+
   /**
    * Sends a message to an agent.
    * @param toId the id of the agent to say to

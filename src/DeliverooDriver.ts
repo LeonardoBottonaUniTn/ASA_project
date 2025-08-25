@@ -13,6 +13,7 @@ import {
   findClosestDeliveryZone,
   getParcelGeneratorInAssignedArea,
 } from './utils/utils.js'
+import Communication from './lib/Communication.js'
 
 console.log(`Deliveroo BDI Agent [${config.agent.name}] starting...`)
 
@@ -25,6 +26,7 @@ const beliefSet = new BeliefSet()
 const pathFinder = new Pathfinder()
 const actionHandler = new ActionHandler(client)
 const bdiAgent = new Agent()
+const communication = new Communication()
 
 // 3. Register socket event listeners
 console.log('Registering event listeners...')
@@ -87,12 +89,23 @@ client.onAgentsSensing(
   },
 )
 
-// todo infer type of reply from usage, should be the same as the `ask` directive
-client.onMsg(async (id: string, name: string, msg: Message, reply: () => void) => {
+client.onMsg(async (id: string, _: string, msg: Message, reply: (msg: Message) => void) => {
   // Handle incoming messages from other agents and reply accordingly if necessary
+  communication.handleMessage(id, msg, reply)
 })
 
-client.onConnect(() => console.log('Successfully connected and registered to the environment.'))
+client.onConnect(() => {
+  console.log('Successfully connected and registered to the environment.')
+  if (config.mode === GameMode.CoOp) {
+    let discoveryInterval = setInterval(() => {
+      if (!bdiAgent.handshakeComplete) {
+        communication.discover()
+      } else {
+        clearInterval(discoveryInterval)
+      }
+    }, 5000) // Periodically discover teammate until handshake is complete
+  }
+})
 
 client.onDisconnect(() => console.log('Disconnected from the environment.'))
 
@@ -239,4 +252,4 @@ if (config.usePddl) {
   }, 50)
 }
 
-export { actionHandler, beliefSet, pathFinder }
+export { actionHandler, beliefSet, pathFinder, bdiAgent }

@@ -20,6 +20,7 @@ interface Config {
   }
   mode: GameMode
   usePddl: boolean
+  TEAM_KEY: string
 }
 
 const config: Config = {
@@ -33,8 +34,9 @@ const config: Config = {
   agent: {
     name: 'BDI-Agent-007',
   },
-  mode: GameMode.SingleAgent,
-  usePddl: true, // use PDDL to generate plans
+  mode: GameMode.CoOp,
+  usePddl: false, // use PDDL to generate GO_TO plans
+  TEAM_KEY: 'leonardo-gabriele-team',
 }
 
 export default config

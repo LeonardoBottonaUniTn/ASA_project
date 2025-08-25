@@ -75,17 +75,37 @@ export interface Path {
 }
 
 export enum MessageType {
-  SYNC = 'sync',
-  PICKUP = 'pickup',
-  DELIVERY = 'delivery',
-  SENSED_PARCELS = 'sensed_parcels',
-  SENSED_AGENTS = 'sensed_agents',
-  // todo
+  HANDSHAKE_INIT = 'handshake_init',
+  HANDSHAKE_ACK = 'handshake_ack',
+  HANDSHAKE_CONFIRM = 'handshake_confirm',
+  HELLO = 'hello',
 }
 
-export interface MessageContent {
-  // todo
+export interface HelloMessageContent {
+  teamId: string
+  agentId: string
+  timestamp: number
 }
+
+export interface HandshakeInitContent {
+  teamKey: string
+  nonce: string
+  from: string
+}
+
+export interface HandshakeAckContent {
+  teamKey: string
+  sessionId: string
+  from: string
+  echoNonce: string
+}
+
+export interface HandshakeConfirmContent {
+  sessionId: string
+  from: string
+}
+
+export type MessageContent = HandshakeInitContent | HandshakeAckContent | HandshakeConfirmContent | HelloMessageContent
 
 export interface Message {
   type: MessageType
