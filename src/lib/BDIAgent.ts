@@ -4,9 +4,22 @@ import { DesireType, Predicate } from '../types/index.js'
 
 export class BDI_Agent {
   #intentionQueue: Intention[] = new Array<Intention>()
+  #onQueueEmpty: (() => void) | null = null
+
+  get intentionQueue() {
+    return this.#intentionQueue
+  }
 
   get currentIntention() {
     return this.#intentionQueue[0]
+  }
+
+  /**
+   * Sets a callback to be executed when the intention queue becomes empty.
+   * @param callback The function to call.
+   */
+  onQueueEmpty(callback: () => void) {
+    this.#onQueueEmpty = callback
   }
 
   /**
@@ -57,6 +70,12 @@ export class BDI_Agent {
 
         // Remove from the queue
         this.#intentionQueue.shift()
+
+        // If the queue is now empty, trigger the callback to generate new options
+        if (this.#intentionQueue.length === 0 && this.#onQueueEmpty) {
+          this.log('Intention queue is empty, triggering option generation.')
+          this.#onQueueEmpty()
+        }
       }
       // Postpone next iteration at setImmediate
       await new Promise((res) => setImmediate(res))
@@ -70,7 +89,11 @@ export class BDI_Agent {
     const lastIndex = this.#intentionQueue.length - 1
     const last = lastIndex >= 0 ? this.#intentionQueue[lastIndex] : null
 
-    if (last && JSON.stringify(last.predicate) === JSON.stringify(predicate)) {
+    // Compare predicates ignoring the utility property
+    if (
+      last &&
+      JSON.stringify({ ...last.predicate, utility: undefined }) === JSON.stringify({ ...predicate, utility: undefined })
+    ) {
       return // intention is already being achieved
     }
 

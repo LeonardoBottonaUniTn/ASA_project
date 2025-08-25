@@ -35,6 +35,11 @@ client.onConfig((config: GameConfig) => {
 
 client.onYou((data: { id: string; name: string; x: number; y: number; score: number }) => {
   beliefSet.updateFromYou(data)
+  beliefSet.updateMapPartitioning() // creates the map partitioning
+
+  if (config.usePddl) {
+    generateOptions()
+  }
 })
 
 // this event is triggered once when the agent connects to the environment
@@ -59,6 +64,9 @@ client.onParcelsSensing(
     }[],
   ) => {
     beliefSet.updateFromParcels(parcels)
+    if (config.usePddl) {
+      generateOptions()
+    }
   },
 )
 
@@ -73,6 +81,9 @@ client.onAgentsSensing(
     }[],
   ) => {
     beliefSet.updateFromAgents(agents)
+    if (config.usePddl) {
+      generateOptions()
+    }
   },
 )
 
@@ -191,8 +202,8 @@ const generateOptions = () => {
     }
   }
 
-  // 5. Randomly Explore if no other option is available
-  if (options.length === 0) {
+  // 5. Randomly Explore if no other option is available and there is no current intention
+  if (options.length === 0 && !currentIntention) {
     const generator = getParcelGeneratorInAssignedArea()
     if (generator) {
       bdiAgent.push({
@@ -204,10 +215,10 @@ const generateOptions = () => {
     return
   }
 
+  // 6. Push the best option if it has higher utility than the current intention
   if (options.length > 0) {
     options.sort((a, b) => b.utility - a.utility)
     const bestOption = options[0]
-    const currentIntention = bdiAgent.currentIntention
 
     if ((currentIntention && currentIntention.predicate.utility < bestOption.utility) || !currentIntention) {
       bdiAgent.push(bestOption)
@@ -215,11 +226,12 @@ const generateOptions = () => {
   }
 }
 
-setInterval(() => {
-  if (beliefSet.getMapPartitioning().size === 0) {
-    beliefSet.updateMapPartitioning()
-  }
-  generateOptions()
-}, 5000)
+if (config.usePddl) {
+  bdiAgent.onQueueEmpty(generateOptions)
+} else {
+  setInterval(() => {
+    generateOptions()
+  }, 50)
+}
 
 export { actionHandler, beliefSet, pathFinder }
