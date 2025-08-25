@@ -394,7 +394,5 @@ export function computeParcelGeneratorPartitioning(): Map<string, string> {
       partitioning.set(generatorKey, bestAgentId)
     }
   }
-
-  console.info('Computed parcel generator partitioning.', partitioning)
   return partitioning
 }
