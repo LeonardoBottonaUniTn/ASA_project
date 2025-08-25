@@ -6,7 +6,7 @@ import BeliefSet from './lib/BeliefSet.js'
 import Pathfinder from './lib/Pathfinder.js'
 import Agent from './lib/BDIAgent.js'
 import ActionHandler from './lib/ActionHandler.js'
-import { DesireType, GameConfig, Parcel, Predicate, TileType } from './types/index.js'
+import { DesireType, GameConfig, Message, Parcel, Predicate, TileType } from './types/index.js'
 import {
   calculateDeliveryUtility,
   calculateParcelUtility,
@@ -86,6 +86,11 @@ client.onAgentsSensing(
     }
   },
 )
+
+// todo infer type of reply from usage, should be the same as the `ask` directive
+client.onMsg(async (id: string, name: string, msg: Message, reply: () => void) => {
+  // Handle incoming messages from other agents and reply accordingly if necessary
+})
 
 client.onConnect(() => console.log('Successfully connected and registered to the environment.'))
 

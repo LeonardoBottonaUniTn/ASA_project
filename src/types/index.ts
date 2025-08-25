@@ -74,6 +74,24 @@ export interface Path {
   cost: number
 }
 
+export enum MessageType {
+  SYNC = 'sync',
+  PICKUP = 'pickup',
+  DELIVERY = 'delivery',
+  SENSED_PARCELS = 'sensed_parcels',
+  SENSED_AGENTS = 'sensed_agents',
+  // todo
+}
+
+export interface MessageContent {
+  // todo
+}
+
+export interface Message {
+  type: MessageType
+  content: MessageContent
+}
+
 export interface Heuristic {
   (a: Point, b: Point): number
 }
