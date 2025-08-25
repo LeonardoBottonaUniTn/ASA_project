@@ -32,21 +32,18 @@ export class PddlMove extends Plan {
       throw ['no plan found']
     }
 
-    // todo review why this fails
     for (const action of plan) {
       if (this.stopped) throw ['stopped']
 
       const me = beliefSet.getMe()
       const myPos = { x: Math.round(me.x!), y: Math.round(me.y!) }
 
-      // Determine the action type where action is like: '(move agent1 tile-x1-y1 tile-x2-y2)'
-      const parts = action.slice(1, -1).split(' ')
-      if (parts[0] !== 'move') {
+      if (action.action.toUpperCase() !== 'MOVE') {
         continue
       }
 
-      const fromTile = parts[2]
-      const toTile = parts[3]
+      const fromTile = action.args[1] // e.g., 'TILE-1-3'
+      const toTile = action.args[2] // e.g., 'TILE-1-4'
 
       const fromCoords = fromTile.split('-').slice(1).map(Number)
       const toCoords = toTile.split('-').slice(1).map(Number)
@@ -65,8 +62,8 @@ export class PddlMove extends Plan {
 
       if (dx === 1 && dy === 0) moveDirection = 'right'
       else if (dx === -1 && dy === 0) moveDirection = 'left'
-      else if (dx === 0 && dy === 1) moveDirection = 'down'
-      else if (dx === 0 && dy === -1) moveDirection = 'up'
+      else if (dx === 0 && dy === 1) moveDirection = 'up'
+      else if (dx === 0 && dy === -1) moveDirection = 'down'
 
       if (moveDirection) {
         const result = await client.move(moveDirection)
