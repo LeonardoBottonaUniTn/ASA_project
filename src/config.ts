@@ -5,6 +5,11 @@ dotenv.config({
   path: path.resolve(process.cwd(), '.env'),
 })
 
+export enum GameMode {
+  SingleAgent = 'single-agent',
+  CoOp = 'co-op',
+}
+
 interface Config {
   api: {
     host: string
@@ -12,15 +17,9 @@ interface Config {
   }
   agent: {
     name: string
-    loopInterval: number
-    logInterval: number
   }
-  pathfinder: {
-    algorithm: string
-  }
-  logging: {
-    level: string
-  }
+  mode: GameMode
+  usePddl: boolean
 }
 
 const config: Config = {
@@ -33,22 +32,9 @@ const config: Config = {
   // Agent-specific settings
   agent: {
     name: 'BDI-Agent-007',
-    // The interval (in milliseconds) for the BDI engine's main loop
-    loopInterval: 500,
-    // The interval (in milliseconds) for logging the agent's belief state
-    logInterval: 10000,
   },
-
-  // Pathfinder settings
-  pathfinder: {
-    // 'bfs' or 'astar' (once implemented)
-    algorithm: 'bfs',
-  },
-
-  // Debugging and logging
-  logging: {
-    level: 'info', // e.g., 'debug', 'info', 'warn', 'error'
-  },
+  mode: GameMode.SingleAgent,
+  usePddl: true, // use PDDL to generate plans
 }
 
 export default config
