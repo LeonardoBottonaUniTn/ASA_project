@@ -6,6 +6,8 @@
   "main": "dist/DeliverooDriver.js",
   "scripts": {
     "start": "tsc && node dist/DeliverooDriver.js",
+    "start:agent1": "AGENT_ID=1 npm start",
+    "start:agent2": "AGENT_ID=2 npm start",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

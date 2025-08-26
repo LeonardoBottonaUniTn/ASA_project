@@ -23,11 +23,19 @@ interface Config {
   TEAM_KEY: string
 }
 
+const agentId = process.env.AGENT_ID
+let token
+if (agentId === '1') {
+  token = process.env.CLIENT_TOKEN_1
+} else if (agentId === '2') {
+  token = process.env.CLIENT_TOKEN_2
+}
+
 const config: Config = {
   // Connection details for the Deliveroo simulation environment
   api: {
     host: process.env.API_HOST || 'http://localhost:8080',
-    token: process.env.CLIENT_TOKEN,
+    token: token,
   },
 
   // Agent-specific settings
