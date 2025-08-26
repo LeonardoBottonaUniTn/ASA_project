@@ -1,6 +1,8 @@
 import { DesireType, Predicate } from '../../types/index.js'
 import { Plan } from './Plan.js'
-import { beliefSet, actionHandler as client } from '../../DeliverooDriver.js'
+import { bdiAgent, beliefSet, actionHandler as client, communication } from '../../DeliverooDriver.js'
+import config, { GameMode } from '../../config.js'
+import { computeParcelGeneratorPartitioning } from '../../utils/utils.js'
 
 export class DeliverPlan extends Plan {
   static isApplicableTo(desire: DesireType) {
@@ -19,8 +21,14 @@ export class DeliverPlan extends Plan {
     const parcels = await client.drop()
     if (parcels.length > 0) {
       beliefSet.clearCarryingParcels()
-      // Recompute partitioning after a successful delivery
-      beliefSet.updateMapPartitioning()
+
+      // if in Co-Op mode and responsible for partitioning computation,
+      // recompute partitioning after a successful delivery
+      if (config.mode === GameMode.CoOp && bdiAgent.initiatedHandshake) {
+        const newPartitioning = computeParcelGeneratorPartitioning()
+        beliefSet.updateMapPartitioning(newPartitioning)
+        await communication.sendMapPartitioning(newPartitioning) // send to teammate
+      }
     }
     if (this.stopped) throw ['stopped'] // if stopped then quit
     return true

@@ -10,6 +10,7 @@ import { DesireType, GameConfig, Message, Parcel, Predicate, TileType, Agent as 
 import {
   calculateDeliveryUtility,
   calculateParcelUtility,
+  computeParcelGeneratorPartitioning,
   findClosestDeliveryZone,
   getParcelGeneratorInAssignedArea,
 } from './utils/utils.js'
@@ -35,9 +36,8 @@ client.onConfig((config: GameConfig) => {
   beliefSet.updateFromConfig(config)
 })
 
-client.onYou((data: { id: string; name: string; x: number; y: number; score: number }) => {
+client.onYou((data: { id: string; name: string; x: number; y: number; score: number; penalty: number }) => {
   beliefSet.updateFromYou(data)
-  beliefSet.updateMapPartitioning() // creates the map partitioning
 
   if (config.mode === GameMode.CoOp) {
     communication.sendMyInfo(beliefSet.getMe() as AgentType)
@@ -69,6 +69,9 @@ client.onParcelsSensing(
       reward: number
     }[],
   ) => {
+    // Detect if a new parcel has spawned before updating the belief set.
+    const newParcelSpawned = parcels.some((p) => !beliefSet.getParcel(p.id))
+
     beliefSet.updateFromParcels(parcels)
     if (config.mode === GameMode.CoOp && parcels.length > 0) {
       communication.sendParcelsSensed(parcels)
@@ -87,6 +90,7 @@ client.onAgentsSensing(
       x: number
       y: number
       score: number
+      penalty: number
     }[],
   ) => {
     beliefSet.updateFromAgents(agents)
@@ -118,7 +122,22 @@ client.onConnect(() => {
       } else {
         clearInterval(discoveryInterval)
       }
-    }, 5000) // Periodically discover teammate until handshake is complete
+    }, 1000) // Periodically discover teammate until handshake is complete
+
+    let partitioningInterval = setInterval(() => {
+      if (bdiAgent.handshakeComplete && bdiAgent.initiatedHandshake) {
+        const newPartitioning = computeParcelGeneratorPartitioning()
+        console.log('new partitioning', newPartitioning)
+        if (newPartitioning.size > 0) {
+          beliefSet.updateMapPartitioning(newPartitioning)
+
+          // communicate partitioning to the teammate
+          communication.sendMapPartitioning(newPartitioning)
+        }
+      } else if (bdiAgent.handshakeComplete && !bdiAgent.initiatedHandshake) {
+        clearInterval(partitioningInterval)
+      }
+    }, 1000) // Periodically update partitioning
   }
 })
 
@@ -132,7 +151,7 @@ console.log('Agent is running and ready.')
 const generateOptions = () => {
   const gameMode: GameMode = config.mode!
   const me = beliefSet.getMe()
-  if (!me || me.x === undefined || me.y === undefined) {
+  if (!me) {
     return
   }
   const currentIntention = bdiAgent.currentIntention
@@ -155,7 +174,7 @@ const generateOptions = () => {
     if (gameMode === GameMode.SingleAgent) {
       return true
     }
-    // In multi-agent mode, only pick up parcels assigned to this agent
+    // In multi-agent mode, only pick up parcels in tiles assigned to this agent
     const posKey = `${parcel.x},${parcel.y}`
     const assignedAgent = mapPartitioning.get(posKey)
     return assignedAgent === me.id
@@ -264,7 +283,7 @@ if (config.usePddl) {
 } else {
   setInterval(() => {
     generateOptions()
-  }, 5000)
+  }, 1000)
 }
 
-export { actionHandler, beliefSet, pathFinder, bdiAgent }
+export { actionHandler, beliefSet, pathFinder, bdiAgent, communication }

@@ -5,6 +5,7 @@ import { DesireType, Predicate } from '../types/index.js'
 export class BDI_Agent {
   #intentionQueue: Intention[] = new Array<Intention>()
   #onQueueEmpty: (() => void) | null = null
+  #initiatedHandshake: boolean = false
   #handshakeComplete: boolean = false
   #teammateId: string | null = null
   #sessionId: string | null = null
@@ -15,6 +16,10 @@ export class BDI_Agent {
 
   get currentIntention(): Intention | undefined {
     return this.#intentionQueue[0]
+  }
+
+  get initiatedHandshake(): boolean {
+    return this.#initiatedHandshake
   }
 
   get handshakeComplete(): boolean {
@@ -33,6 +38,10 @@ export class BDI_Agent {
     this.#teammateId = teammateId
     this.#sessionId = sessionId
     this.#handshakeComplete = true
+  }
+
+  set initiatedHandshake(value: boolean) {
+    this.#initiatedHandshake = value
   }
 
   set handshakeComplete(value: boolean) {

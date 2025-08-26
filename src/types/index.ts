@@ -4,6 +4,7 @@ export interface Agent {
   x: number
   y: number
   score: number
+  penalty: number
 }
 
 export interface Parcel {
