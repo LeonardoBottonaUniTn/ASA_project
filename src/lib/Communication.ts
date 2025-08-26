@@ -5,6 +5,11 @@ import {
   HandshakeAckContent,
   HandshakeConfirmContent,
   HelloMessageContent,
+  Parcel,
+  Agent,
+  ParcelsSensedContent,
+  AgentsSensedContent,
+  MyInfoContent,
 } from '../types/index.js'
 import { randomUUID } from 'crypto'
 import config from '../config.js'
@@ -13,6 +18,14 @@ import { beliefSet, actionHandler, bdiAgent } from '../DeliverooDriver.js'
 class Communication {
   private discoveredTeammates: Map<string, number> = new Map()
 
+  /**
+   * Broadcasts a hello message to discover other team members in the environment.
+   *
+   * The message allows the other team member to discover this agent's presence
+   * and initiate handshake.
+   *
+   * @returns {Promise<void>} A promise that resolves when the message has been shouted
+   */
   public async discover() {
     const me = beliefSet.getMe()
     if (!me) return
@@ -28,6 +41,18 @@ class Communication {
     await actionHandler.shout(helloMessage)
   }
 
+  /**
+   * Initiates a three-way handshake protocol with another agent to establish communication.
+   *
+   * The handshake process consists of three steps:
+   * 1. Send an init message with a nonce to the partner
+   * 2. Receive an acknowledgment containing the echoed nonce and a new session ID
+   * 3. Send a confirmation message to complete the handshake
+   *
+   * @param partnerId - The ID of the agent to establish handshake with
+   * @returns Promise that resolves when handshake is complete or fails
+   * @throws Error if communication fails during handshake process
+   */
   public async initiateHandshake(partnerId: string): Promise<void> {
     const myId = beliefSet.getMe()?.id
     if (!myId) return
@@ -68,7 +93,92 @@ class Communication {
     }
   }
 
-  public handleMessage(fromId: string, msg: Message, reply: (msg: Message) => void): void {
+  /**
+   * Sends information about sensed parcels to the teammate agent.
+   *
+   * @param parcels - Array of sensed parcels.
+   * @returns Promise that resolves when the message has been sent
+   */
+  public async sendParcelsSensed(parcels: Parcel[]): Promise<void> {
+    const partnerId = bdiAgent.teammateId
+    const sessionId = bdiAgent.sessionId
+
+    if (!partnerId || !sessionId) return
+
+    const message: Message = {
+      type: MessageType.PARCELS_SENSED,
+      content: {
+        sessionId,
+        parcels,
+      } as ParcelsSensedContent,
+    }
+
+    await actionHandler.say(partnerId, message)
+  }
+
+  /**
+   * Sends information about sensed (other) agents to the teammate agent.
+   *
+   * @param agents - Array of sensed (other) agents.
+   * @returns Promise that resolves when the message has been sent
+   */
+  public async sendAgentsSensed(agents: Agent[]): Promise<void> {
+    const partnerId = bdiAgent.teammateId
+    const sessionId = bdiAgent.sessionId
+
+    if (!partnerId || !sessionId) return
+
+    const message: Message = {
+      type: MessageType.AGENTS_SENSED,
+      content: {
+        sessionId,
+        agents,
+      } as AgentsSensedContent,
+    }
+
+    await actionHandler.say(partnerId, message)
+  }
+
+  /**
+   * Sends information about this agent to the teammate agent.
+   *
+   * @param {Agent} info - Information about this agent.
+   * @returns Promise that resolves when the message has been sent
+   */
+  public async sendMyInfo(info: Agent): Promise<void> {
+    const partnerId = bdiAgent.teammateId
+    const sessionId = bdiAgent.sessionId
+
+    if (!partnerId || !sessionId) return
+
+    const message: Message = {
+      type: MessageType.MY_INFO,
+      content: {
+        sessionId,
+        info,
+      } as MyInfoContent,
+    }
+
+    await actionHandler.say(partnerId, message)
+  }
+
+  /**
+   * Handles incoming messages from other agents and processes them according to their type.
+   *
+   * - HELLO messages: Used for team member discovery
+   * - HANDSHAKE_INIT messages: First step of the handshake protocol
+   * - HANDSHAKE_CONFIRM messages: Final step of the handshake protocol
+   * - PARCELS_SENSED messages: Used to update the teammate's sensed parcels
+   * - AGENTS_SENSED messages: Used to update the teammate's sensed agents
+   * - MY_INFO messages: Used to update the teammate's state
+   *
+   * @param fromId - The ID of the agent sending the message
+   * @param msg - The received message object
+   * @param reply - Callback function to send a reply message
+   * @param onSensedData - Callback function to call when sensed data is
+   * received (used to trigger option generation)
+   */
+  public handleMessage(fromId: string, msg: Message, reply: (msg: Message) => void, onSensedData: () => void): void {
     const myId = beliefSet.getMe()?.id
     if (!myId) return
 
@@ -106,6 +216,33 @@ class Communication {
         const { sessionId } = msg.content as HandshakeConfirmContent
         bdiAgent.setHandshake(fromId, sessionId)
         console.log(`Handshake confirmed with ${fromId}, session ${sessionId}`)
+        break
+      }
+      case MessageType.PARCELS_SENSED: {
+        const { sessionId, parcels } = msg.content as ParcelsSensedContent
+        if (sessionId === bdiAgent.sessionId) {
+          console.log(`Received ${parcels.length} parcels from ${fromId}`)
+          beliefSet.updateFromParcels(parcels)
+          onSensedData() // triggers options generation
+        }
+        break
+      }
+      case MessageType.AGENTS_SENSED: {
+        const { sessionId, agents } = msg.content as AgentsSensedContent
+        if (sessionId === bdiAgent.sessionId) {
+          console.log(`Received ${agents.length} agents from ${fromId}`)
+          beliefSet.updateFromAgents(agents)
+          onSensedData() // triggers options generation
+        }
+        break
+      }
+      case MessageType.MY_INFO: {
+        const { sessionId, info } = msg.content as MyInfoContent
+        if (sessionId === bdiAgent.sessionId) {
+          console.log(`Received info from ${fromId} about their new status`)
+          beliefSet.setTeammate(info)
+          onSensedData() // triggers options generation
+        }
         break
       }
     }

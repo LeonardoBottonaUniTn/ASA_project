@@ -75,10 +75,13 @@ export interface Path {
 }
 
 export enum MessageType {
+  HELLO = 'hello',
   HANDSHAKE_INIT = 'handshake_init',
   HANDSHAKE_ACK = 'handshake_ack',
   HANDSHAKE_CONFIRM = 'handshake_confirm',
-  HELLO = 'hello',
+  PARCELS_SENSED = 'parcels_sensed',
+  AGENTS_SENSED = 'agents_sensed',
+  MY_INFO = 'my_info',
 }
 
 export interface HelloMessageContent {
@@ -105,7 +108,29 @@ export interface HandshakeConfirmContent {
   from: string
 }
 
-export type MessageContent = HandshakeInitContent | HandshakeAckContent | HandshakeConfirmContent | HelloMessageContent
+export interface ParcelsSensedContent {
+  sessionId: string
+  parcels: Parcel[]
+}
+
+export interface AgentsSensedContent {
+  sessionId: string
+  agents: Agent[]
+}
+
+export interface MyInfoContent {
+  sessionId: string
+  info: Agent
+}
+
+export type MessageContent =
+  | HandshakeInitContent
+  | HandshakeAckContent
+  | HandshakeConfirmContent
+  | HelloMessageContent
+  | ParcelsSensedContent
+  | AgentsSensedContent
+  | MyInfoContent
 
 export interface Message {
   type: MessageType

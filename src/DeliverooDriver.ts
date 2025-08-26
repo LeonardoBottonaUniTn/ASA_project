@@ -6,7 +6,7 @@ import BeliefSet from './lib/BeliefSet.js'
 import Pathfinder from './lib/Pathfinder.js'
 import Agent from './lib/BDIAgent.js'
 import ActionHandler from './lib/ActionHandler.js'
-import { DesireType, GameConfig, Message, Parcel, Predicate, TileType } from './types/index.js'
+import { DesireType, GameConfig, Message, Parcel, Predicate, TileType, Agent as AgentType } from './types/index.js'
 import {
   calculateDeliveryUtility,
   calculateParcelUtility,
@@ -39,6 +39,10 @@ client.onYou((data: { id: string; name: string; x: number; y: number; score: num
   beliefSet.updateFromYou(data)
   beliefSet.updateMapPartitioning() // creates the map partitioning
 
+  if (config.mode === GameMode.CoOp) {
+    communication.sendMyInfo(beliefSet.getMe() as AgentType)
+  }
+
   if (config.usePddl) {
     generateOptions()
   }
@@ -66,6 +70,9 @@ client.onParcelsSensing(
     }[],
   ) => {
     beliefSet.updateFromParcels(parcels)
+    if (config.mode === GameMode.CoOp && parcels.length > 0) {
+      communication.sendParcelsSensed(parcels)
+    }
     if (config.usePddl) {
       generateOptions()
     }
@@ -83,6 +90,14 @@ client.onAgentsSensing(
     }[],
   ) => {
     beliefSet.updateFromAgents(agents)
+    if (config.mode === GameMode.CoOp) {
+      const teammateId = bdiAgent.teammateId
+      const filteredAgents = agents.filter((agent) => agent.id !== teammateId)
+
+      if (filteredAgents.length > 0) {
+        communication.sendAgentsSensed(filteredAgents)
+      }
+    }
     if (config.usePddl) {
       generateOptions()
     }
@@ -91,7 +106,7 @@ client.onAgentsSensing(
 
 client.onMsg(async (id: string, _: string, msg: Message, reply: (msg: Message) => void) => {
   // Handle incoming messages from other agents and reply accordingly if necessary
-  communication.handleMessage(id, msg, reply)
+  communication.handleMessage(id, msg, reply, generateOptions)
 })
 
 client.onConnect(() => {
@@ -249,7 +264,7 @@ if (config.usePddl) {
 } else {
   setInterval(() => {
     generateOptions()
-  }, 50)
+  }, 5000)
 }
 
 export { actionHandler, beliefSet, pathFinder, bdiAgent }

@@ -3,6 +3,7 @@ import { computeLongestPath, computeParcelGeneratorPartitioning, parseTimeInterv
 
 export class BeliefSet {
   private me: Partial<Agent> = {}
+  private teammate: Partial<Agent> = {}
   private carrying: Parcel[] = []
   private grid: Partial<Grid> = {}
   private parcels: Map<string, ExtendedParcel> = new Map()
@@ -21,6 +22,14 @@ export class BeliefSet {
    */
   getMe(): Partial<Agent> {
     return this.me
+  }
+
+  /**
+   * Returns the current teammate's state.
+   * @returns {Partial<Agent>}
+   */
+  getTeammate(): Partial<Agent> {
+    return this.teammate
   }
 
   /**
@@ -128,6 +137,14 @@ export class BeliefSet {
    */
   getMapPartitioning(): Map<string, string> {
     return this.mapPartitioning
+  }
+
+  /**
+   * Sets the current teammate's state.
+   * @param {Agent} teammate - The teammate's state.
+   */
+  setTeammate(teammate: Agent) {
+    this.teammate = teammate
   }
 
   /**
