@@ -14,8 +14,10 @@ export class PddlProblem {
 
   generatePddlProblem(goal: Point): string {
     const grid = this.beliefSet.getGrid()
+    if (!grid) throw ['no grid']
     const me = this.beliefSet.getMe()
-    const myPos = { x: Math.round(me.x!), y: Math.round(me.y!) }
+    if (!me) throw ['no me']
+    const myPos = { x: Math.round(me.x), y: Math.round(me.y) }
 
     const objects: string[] = []
     const init: string[] = []

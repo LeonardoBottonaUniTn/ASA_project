@@ -17,7 +17,8 @@ export class PddlMove extends Plan {
 
     // Check if already at destination
     const me = beliefSet.getMe()
-    const myPos = { x: Math.round(me.x!), y: Math.round(me.y!) }
+    if (!me) throw ['no me']
+    const myPos = { x: Math.round(me.x), y: Math.round(me.y) }
     if (myPos.x === predicate.destination.x && myPos.y === predicate.destination.y) {
       return true // already at destination
     }
@@ -38,7 +39,8 @@ export class PddlMove extends Plan {
       if (this.stopped) throw ['stopped']
 
       const me = beliefSet.getMe()
-      const myPos = { x: Math.round(me.x!), y: Math.round(me.y!) }
+      if (!me) throw ['no me']
+      const myPos = { x: Math.round(me.x), y: Math.round(me.y) }
 
       if (action.action.toUpperCase() !== 'MOVE') {
         continue

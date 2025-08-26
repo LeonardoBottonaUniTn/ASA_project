@@ -335,7 +335,7 @@ export function computeLongestPath(): number {
  */
 export function getParcelGeneratorInAssignedArea(): Point | null {
   const me = beliefSet.getMe()
-  if (!me.id) return null
+  if (!me) return null
 
   const partitioning = beliefSet.getMapPartitioning()
   const myGenerators: Point[] = []
@@ -356,20 +356,22 @@ export function getParcelGeneratorInAssignedArea(): Point | null {
 }
 
 /**
- * Computes the Voronoi-based partitioning of parcel generators among all agents.
+ * Computes the Voronoi-based partitioning of parcel generators the two
+ * collaboarating agents.
  * Each generator is assigned to the nearest agent based on shortest-path distance.
  * This method is called when the partitioning needs to be updated,
  * e.g., when a new parcel spawns or a delivery is completed.
  * @returns A Map where keys are generator coordinates ("x,y") and values are agent IDs
  */
 export function computeParcelGeneratorPartitioning(): Map<string, string> {
+  const partitioning = new Map<string, string>()
   const generators = beliefSet.getParcelGenerators()
   const me = beliefSet.getMe()
-  // @todo only partition with the friendly agent, not all of the other agents
-  const otherAgents = Array.from(beliefSet.getOtherAgents().values())
-  const allAgents = [me, ...otherAgents].filter((a) => a.id != null) as Agent[]
+  const teammate = beliefSet.getTeammate()
 
-  const partitioning = new Map<string, string>()
+  if (!me || !teammate) return partitioning
+
+  const allAgents = [me, teammate] as Agent[]
 
   if (allAgents.length === 0 || generators.length === 0) {
     return partitioning

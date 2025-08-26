@@ -1,11 +1,11 @@
 import { Agent, Parcel, Grid, Point, TileType, GameConfig, ExtendedParcel } from '../types/index.js'
-import { computeLongestPath, computeParcelGeneratorPartitioning, parseTimeInterval } from '../utils/utils.js'
+import { computeLongestPath, parseTimeInterval } from '../utils/utils.js'
 
 export class BeliefSet {
-  private me: Partial<Agent> = {}
-  private teammate: Partial<Agent> = {}
+  private me: Agent | null = null
+  private teammate: Agent | null = null
   private carrying: Parcel[] = []
-  private grid: Partial<Grid> = {}
+  private grid: Grid | null = null
   private parcels: Map<string, ExtendedParcel> = new Map()
   private deliveryZones: Point[] = []
   private parcelGenerators: Point[] = []
@@ -18,17 +18,17 @@ export class BeliefSet {
 
   /**
    * Returns the current agent's state.
-   * @returns {Partial<Agent>}
+   * @returns {Agent | null}
    */
-  getMe(): Partial<Agent> {
+  getMe(): Agent | null {
     return this.me
   }
 
   /**
    * Returns the current teammate's state.
-   * @returns {Partial<Agent>}
+   * @returns {Agent | null}
    */
-  getTeammate(): Partial<Agent> {
+  getTeammate(): Agent | null {
     return this.teammate
   }
 
@@ -42,9 +42,9 @@ export class BeliefSet {
 
   /**
    * Returns the current map grid.
-   * @returns {Partial<Grid>}
+   * @returns {Grid | null}
    */
-  getGrid(): Partial<Grid> {
+  getGrid(): Grid | null {
     return this.grid
   }
 
@@ -194,8 +194,7 @@ export class BeliefSet {
   /**
    * Updates the Voronoi partitioning of parcel generators.
    */
-  updateMapPartitioning() {
-    const newPartitioning = computeParcelGeneratorPartitioning()
+  updateMapPartitioning(newPartitioning: Map<string, string>) {
     console.info('Map partitioning updated:', newPartitioning)
     this.mapPartitioning = newPartitioning
   }
@@ -205,9 +204,6 @@ export class BeliefSet {
    * @param {Parcel[]} parcelsData - Data from onParcelsSensing event.
    */
   updateFromParcels(parcelsData: Parcel[]) {
-    // Detect if a new parcel has spawned before updating the belief set.
-    const newParcelSpawned = parcelsData.some((p) => !this.parcels.has(p.id))
-
     const seenParcels = new Set<string>()
     const currentTime = Date.now()
 
@@ -264,11 +260,6 @@ export class BeliefSet {
         this.activeParcelPositions.set(posKey, parcel.id)
       }
     }
-
-    // If a new parcel was detected, recompute the partitioning.
-    if (newParcelSpawned) {
-      this.updateMapPartitioning()
-    }
   }
 
   /**
@@ -280,7 +271,7 @@ export class BeliefSet {
     const now = Date.now()
 
     for (const agent of data) {
-      if (agent.id !== this.me.id) {
+      if (agent.id !== this.me?.id) {
         // If we've seen this agent before, remove its old position from the occupied map.
         if (this.otherAgents.has(agent.id)) {
           const oldAgent = this.otherAgents.get(agent.id)!
@@ -357,7 +348,7 @@ export class BeliefSet {
         x: parcel.x,
         y: parcel.y,
         reward: parcel.reward,
-        carriedBy: this.me.id,
+        carriedBy: this.me?.id,
       })
     }
   }
@@ -382,7 +373,7 @@ export class BeliefSet {
    * @returns {Point | null} The position of the delivery tile if on a delivery tile, null otherwise.
    */
   isOnDeliveryTile(): Point | null {
-    if (!this.me.x || !this.me.y || !this.grid.tiles) {
+    if (!this.me || !this.grid) {
       return null
     }
     const x = Math.floor(this.me.x)
@@ -396,7 +387,7 @@ export class BeliefSet {
    * @returns {string} The id of the active parcel at the current position, or false if no active parcel is found.
    */
   getParcelIdAtCurrentPosition(): string | null {
-    if (!this.me.x || !this.me.y || !this.grid.tiles) {
+    if (!this.me || !this.grid) {
       return null
     }
     const x = Math.round(this.me.x)
