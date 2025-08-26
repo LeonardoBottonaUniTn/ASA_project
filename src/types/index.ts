@@ -82,6 +82,7 @@ export enum MessageType {
   PARCELS_SENSED = 'parcels_sensed',
   AGENTS_SENSED = 'agents_sensed',
   MY_INFO = 'my_info',
+  MAP_PARTITIONING = 'map_partitioning',
 }
 
 export interface HelloMessageContent {
@@ -123,6 +124,11 @@ export interface MyInfoContent {
   info: Agent
 }
 
+export interface MapPartitioningContent {
+  sessionId: string
+  partitioning: string // key position (x, y) -> agentId, serialized Map
+}
+
 export type MessageContent =
   | HandshakeInitContent
   | HandshakeAckContent
@@ -131,6 +137,7 @@ export type MessageContent =
   | ParcelsSensedContent
   | AgentsSensedContent
   | MyInfoContent
+  | MapPartitioningContent
 
 export interface Message {
   type: MessageType

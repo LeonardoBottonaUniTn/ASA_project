@@ -10,6 +10,7 @@ import {
   ParcelsSensedContent,
   AgentsSensedContent,
   MyInfoContent,
+  MapPartitioningContent,
 } from '../types/index.js'
 import { randomUUID } from 'crypto'
 import config from '../config.js'
@@ -85,6 +86,7 @@ class Communication {
           } as HandshakeConfirmContent,
         }
         await actionHandler.say(partnerId, confirmMessage)
+        bdiAgent.initiatedHandshake = true
         bdiAgent.setHandshake(partnerId, sessionId)
         console.log(`Handshake established with ${partnerId}, session ${sessionId}`)
       }
@@ -140,6 +142,33 @@ class Communication {
   }
 
   /**
+   * Sends the map partitioning to the teammate agent.
+   *
+   * @param partitioning - The map partitioning to send.
+   * @returns Promise that resolves when the message has been sent
+   */
+  public async sendMapPartitioning(partitioning: Map<string, string>): Promise<void> {
+    const partnerId = bdiAgent.teammateId
+    const sessionId = bdiAgent.sessionId
+
+    if (!partnerId || !sessionId) return
+
+    // serialize the map partitioning
+    const object = Object.fromEntries(partitioning)
+    const json = JSON.stringify(object)
+
+    const message: Message = {
+      type: MessageType.MAP_PARTITIONING,
+      content: {
+        sessionId,
+        partitioning: json,
+      } as MapPartitioningContent,
+    }
+
+    await actionHandler.say(partnerId, message)
+  }
+
+  /**
    * Sends information about this agent to the teammate agent.
    *
    * @param {Agent} info - Information about this agent.
@@ -171,6 +200,7 @@ class Communication {
    * - PARCELS_SENSED messages: Used to update the teammate's sensed parcels
    * - AGENTS_SENSED messages: Used to update the teammate's sensed agents
    * - MY_INFO messages: Used to update the teammate's state
+   * - MAP_PARTITIONING messages: Used to update this agent's map partitioning
    *
    * @param fromId - The ID of the agent sending the message
    * @param msg - The received message object
@@ -242,6 +272,15 @@ class Communication {
           console.log(`Received info from ${fromId} about their new status`)
           beliefSet.setTeammate(info)
           onSensedData() // triggers options generation
+        }
+        break
+      }
+      case MessageType.MAP_PARTITIONING: {
+        const { sessionId, partitioning: partitioningJson } = msg.content as MapPartitioningContent
+        if (sessionId === bdiAgent.sessionId) {
+          console.log(`Received map partitioning from ${fromId}:`, partitioningJson)
+          const partitioning: Map<string, string> = new Map(Object.entries(JSON.parse(partitioningJson)))
+          beliefSet.updateMapPartitioning(partitioning)
         }
         break
       }
