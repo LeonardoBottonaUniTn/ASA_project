@@ -101,7 +101,7 @@ export interface HandshakeInitContent {
 export interface HandshakeAckContent {
   teamKey: string
   sessionId: string
-  from: string
+  from: Agent
   echoNonce: string
 }
 

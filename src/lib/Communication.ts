@@ -78,6 +78,7 @@ class Communication {
         ackContent.echoNonce === nonce
       ) {
         const sessionId = ackContent.sessionId
+        const teammate = ackContent.from
         const confirmMessage: Message = {
           type: MessageType.HANDSHAKE_CONFIRM,
           content: {
@@ -88,6 +89,7 @@ class Communication {
         await actionHandler.say(partnerId, confirmMessage)
         bdiAgent.initiatedHandshake = true
         bdiAgent.setHandshake(partnerId, sessionId)
+        beliefSet.setTeammate(teammate)
         console.log(`Handshake established with ${partnerId}, session ${sessionId}`)
       }
     } catch (error) {
@@ -234,7 +236,7 @@ class Communication {
             content: {
               teamKey: config.TEAM_KEY,
               sessionId,
-              from: myId,
+              from: beliefSet.getMe(),
               echoNonce: nonce,
             } as HandshakeAckContent,
           }
