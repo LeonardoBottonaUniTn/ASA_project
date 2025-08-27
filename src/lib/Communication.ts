@@ -253,7 +253,7 @@ class Communication {
       case MessageType.PARCELS_SENSED: {
         const { sessionId, parcels } = msg.content as ParcelsSensedContent
         if (sessionId === bdiAgent.sessionId) {
-          console.log(`Received ${parcels.length} parcels from ${fromId}`)
+          // console.log(`Received ${parcels.length} parcels from ${fromId}`)
           beliefSet.updateFromParcels(parcels)
           onSensedData() // triggers options generation
         }
@@ -262,7 +262,7 @@ class Communication {
       case MessageType.AGENTS_SENSED: {
         const { sessionId, agents } = msg.content as AgentsSensedContent
         if (sessionId === bdiAgent.sessionId) {
-          console.log(`Received ${agents.length} agents from ${fromId}`)
+          // console.log(`Received ${agents.length} agents from ${fromId}`)
           beliefSet.updateFromAgents(agents)
           onSensedData() // triggers options generation
         }
@@ -271,8 +271,9 @@ class Communication {
       case MessageType.MY_INFO: {
         const { sessionId, info } = msg.content as MyInfoContent
         if (sessionId === bdiAgent.sessionId) {
-          console.log(`Received info from ${fromId} about their new status`)
+          // console.log(`Received info from ${fromId} about their new status`)
           beliefSet.setTeammate(info)
+          beliefSet.updateFromAgents([info])
           onSensedData() // triggers options generation
         }
         break
@@ -280,7 +281,6 @@ class Communication {
       case MessageType.MAP_PARTITIONING: {
         const { sessionId, partitioning: partitioningJson } = msg.content as MapPartitioningContent
         if (sessionId === bdiAgent.sessionId) {
-          console.log(`Received map partitioning from ${fromId}:`, partitioningJson)
           const partitioning: Map<string, string> = new Map(Object.entries(JSON.parse(partitioningJson)))
           beliefSet.updateMapPartitioning(partitioning)
         }

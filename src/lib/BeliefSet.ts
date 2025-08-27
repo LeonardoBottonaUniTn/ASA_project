@@ -15,7 +15,6 @@ export class BeliefSet {
   private occupiedPositions: Map<string, number> = new Map() // O(1) lookup for currently unavailable tiles using string keys
   private longestPathLength: number = 0 // longest path between strategic points on the map
   private mapPartitioning: Map<string, string> = new Map() // generator tiles position to agent ID
-
   /**
    * Returns the current agent's state.
    * @returns {Agent | null}
@@ -195,7 +194,7 @@ export class BeliefSet {
    * Updates the Voronoi partitioning of parcel generators.
    */
   updateMapPartitioning(newPartitioning: Map<string, string>) {
-    console.info('Map partitioning updated:', newPartitioning)
+    // console.info('Map partitioning updated:', newPartitioning)
     this.mapPartitioning = newPartitioning
   }
 
@@ -295,7 +294,7 @@ export class BeliefSet {
 
     // Cleanup very old timestamps so the map doesn't grow forever. The forget
     // time is an estimate set as the time it takes for an agent to move along
-    // the longest path on the map.
+    // the **estimated** longest path on the map.
     const forgetMs = this.longestPathLength * this.config.MOVEMENT_DURATION!
 
     for (const [posKey, ts] of this.occupiedPositions.entries()) {

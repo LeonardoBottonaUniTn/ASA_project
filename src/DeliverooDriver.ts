@@ -6,13 +6,15 @@ import BeliefSet from './lib/BeliefSet.js'
 import Pathfinder from './lib/Pathfinder.js'
 import Agent from './lib/BDIAgent.js'
 import ActionHandler from './lib/ActionHandler.js'
-import { DesireType, GameConfig, Message, Parcel, Predicate, TileType, Agent as AgentType } from './types/index.js'
+import { DesireType, GameConfig, Message, Parcel, Predicate, TileType, Point } from './types/index.js'
 import {
   calculateDeliveryUtility,
   calculateParcelUtility,
   computeParcelGeneratorPartitioning,
+  findAvailablePositionNearTeammate,
   findClosestDeliveryZone,
   getParcelGeneratorInAssignedArea,
+  getRandomPosition,
 } from './utils/utils.js'
 import Communication from './lib/Communication.js'
 
@@ -40,7 +42,7 @@ client.onYou((data: { id: string; name: string; x: number; y: number; score: num
   beliefSet.updateFromYou(data)
 
   if (config.mode === GameMode.CoOp) {
-    communication.sendMyInfo(beliefSet.getMe() as AgentType)
+    // communication.sendMyInfo(beliefSet.getMe() as AgentType)
   }
 
   if (config.usePddl) {
@@ -69,9 +71,6 @@ client.onParcelsSensing(
       reward: number
     }[],
   ) => {
-    // Detect if a new parcel has spawned before updating the belief set.
-    const newParcelSpawned = parcels.some((p) => !beliefSet.getParcel(p.id))
-
     beliefSet.updateFromParcels(parcels)
     if (config.mode === GameMode.CoOp && parcels.length > 0) {
       communication.sendParcelsSensed(parcels)
@@ -127,7 +126,7 @@ client.onConnect(() => {
     let partitioningInterval = setInterval(() => {
       if (bdiAgent.handshakeComplete && bdiAgent.initiatedHandshake) {
         const newPartitioning = computeParcelGeneratorPartitioning()
-        console.log('new partitioning', newPartitioning)
+        // console.log('new partitioning', newPartitioning)
         if (newPartitioning.size > 0) {
           beliefSet.updateMapPartitioning(newPartitioning)
 
@@ -151,7 +150,10 @@ console.log('Agent is running and ready.')
 const generateOptions = () => {
   const gameMode: GameMode = config.mode!
   const me = beliefSet.getMe()
-  if (!me) {
+  const teammate = beliefSet.getTeammate()
+  if (gameMode === GameMode.CoOp && !teammate && !me) {
+    return
+  } else if (!me) {
     return
   }
   const currentIntention = bdiAgent.currentIntention
@@ -162,8 +164,8 @@ const generateOptions = () => {
   const isCarrying = beliefSet.hasCarryingParcels()
   const sittingOnDeliveryTile = beliefSet.isOnDeliveryTile()
   const closestDeliveryZone = findClosestDeliveryZone({
-    x: Math.round(myPos.x),
-    y: Math.round(myPos.y),
+    x: myPos.x,
+    y: myPos.y,
   })?.deliveryZone
   const sittingOnParcelId = beliefSet.getParcelIdAtCurrentPosition()
   const mapPartitioning = beliefSet.getMapPartitioning()
@@ -171,13 +173,28 @@ const generateOptions = () => {
     if (parcel.carriedBy || parcel.reward <= 0) {
       return false
     }
-    if (gameMode === GameMode.SingleAgent) {
+    if (gameMode !== GameMode.CoOp) {
       return true
     }
     // In multi-agent mode, only pick up parcels in tiles assigned to this agent
+    // or non-generator tiles (i.e. in hallway scenarion when one agent picks up
+    // a parcel from a generator tile, moves and drops it so that the other
+    // agent can pick it up to deliver it).
     const posKey = `${parcel.x},${parcel.y}`
     const assignedAgent = mapPartitioning.get(posKey)
-    return assignedAgent === me.id
+    const isGenerator = beliefSet.getMapPartitioning().has(posKey)
+
+    if (assignedAgent === me.id) {
+      return true
+    }
+
+    if (!isGenerator) {
+      // This is a parcel in the "hallway".
+      // Only the agent with a delivery zone should pick it up.
+      return !!closestDeliveryZone
+    }
+
+    return false
   })
   const carriedParcels = beliefSet.getCarryingParcels()
   const totalCarriedReward = carriedParcels.reduce((acc, parcel) => acc + parcel.reward, 0)
@@ -185,26 +202,26 @@ const generateOptions = () => {
   let bestParcel: Parcel | null = null
   let maxUtility = -Infinity
 
-  // 1. If currently on a tile with a parcel, pick it up immediately (if parcel
-  //    wasn't already as the target of the current intention)
-  if (sittingOnParcelId != null && currentIntention?.predicate.parcel_id !== sittingOnParcelId) {
-    bdiAgent.push({
-      type: DesireType.PICKUP,
-      destination: {
-        x: Math.round(me.x),
-        y: Math.round(me.y),
-      },
-      utility: Infinity,
-      parcel_id: sittingOnParcelId,
-    })
-    return
+  // 1. High-priority actions
+  // If sitting on a parcel, pick it up immediately.
+  if (sittingOnParcelId && currentIntention?.predicate.parcel_id !== sittingOnParcelId) {
+    const sittingOnAvailableParcel = availableParcels.some((p) => p.id === sittingOnParcelId)
+    if (sittingOnAvailableParcel) {
+      bdiAgent.push({
+        type: DesireType.PICKUP,
+        destination: myPos,
+        utility: Infinity,
+        parcel_id: sittingOnParcelId,
+      })
+      return
+    }
   }
 
   // 2. Deliver all carried parcels (if any) immediately if currently on a
   //    delivery zone and that delivery zone is not the current intention.
   if (
     isCarrying &&
-    sittingOnDeliveryTile != null &&
+    sittingOnDeliveryTile &&
     closestDeliveryZone &&
     currentIntention?.predicate.destination.x !== sittingOnDeliveryTile.x &&
     currentIntention?.predicate.destination.y !== sittingOnDeliveryTile.y
@@ -219,38 +236,53 @@ const generateOptions = () => {
 
   const options: Predicate[] = []
 
-  // 3. Generate all parcel options and choose the one with highest utility
-  for (const parcel of availableParcels) {
-    const utility = calculateParcelUtility(parcel, myPos, totalCarriedReward, numCarriedParcels)
+  // 2. Generate options
+  // Pickup options
+  if (closestDeliveryZone || (gameMode === GameMode.CoOp && getParcelGeneratorInAssignedArea())) {
+    for (const parcel of availableParcels) {
+      const utility = calculateParcelUtility(parcel, myPos, totalCarriedReward, numCarriedParcels)
 
-    if (utility > maxUtility && utility > 0) {
-      maxUtility = utility
-      bestParcel = parcel
+      if (utility > maxUtility && utility > 0) {
+        maxUtility = utility
+        bestParcel = parcel
+      }
+    }
+
+    if (bestParcel) {
+      options.push({
+        type: DesireType.PICKUP,
+        destination: {
+          x: bestParcel.x,
+          y: bestParcel.y,
+        },
+        utility: maxUtility,
+        parcel_id: bestParcel.id,
+      })
     }
   }
 
-  if (bestParcel) {
-    options.push({
-      type: DesireType.PICKUP,
-      destination: {
-        x: bestParcel.x,
-        y: bestParcel.y,
-      },
-      utility: maxUtility,
-      parcel_id: bestParcel.id,
-    })
-  }
-
-  // 4. Generate delivery options
-  if (isCarrying && closestDeliveryZone) {
-    const deliveryUtility = calculateDeliveryUtility(myPos, totalCarriedReward, numCarriedParcels)
-
-    if (deliveryUtility > 0) {
-      options.push({
-        type: DesireType.DELIVER,
-        destination: closestDeliveryZone,
-        utility: deliveryUtility,
-      })
+  // Delivery options
+  if (isCarrying) {
+    if (closestDeliveryZone) {
+      const deliveryUtility = calculateDeliveryUtility(myPos, totalCarriedReward, numCarriedParcels)
+      if (deliveryUtility > 0) {
+        options.push({
+          type: DesireType.DELIVER,
+          destination: closestDeliveryZone,
+          utility: deliveryUtility,
+        })
+      }
+    } else if (gameMode === GameMode.CoOp && getParcelGeneratorInAssignedArea()) {
+      // Co-op: deliver to teammate
+      const availablePosition = findAvailablePositionNearTeammate()
+      if (availablePosition) {
+        const deliveryUtility = calculateDeliveryUtility(myPos, totalCarriedReward, numCarriedParcels)
+        options.push({
+          type: DesireType.DELIVER,
+          destination: availablePosition,
+          utility: deliveryUtility > 0 ? deliveryUtility : 1, // Ensure positive utility
+        })
+      }
     }
   }
 
@@ -264,6 +296,14 @@ const generateOptions = () => {
         utility: 0,
       })
     }
+    //  else {
+    //   const randomPos = getRandomPosition()
+    //   bdiAgent.push({
+    //     type: DesireType.EXPLORATION,
+    //     destination: randomPos,
+    //     utility: 0,
+    //   })
+    // }
     return
   }
 
@@ -283,7 +323,7 @@ if (config.usePddl) {
 } else {
   setInterval(() => {
     generateOptions()
-  }, 1000)
+  }, 50)
 }
 
 export { actionHandler, beliefSet, pathFinder, bdiAgent, communication }

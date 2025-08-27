@@ -11,11 +11,16 @@ export class DeliverPlan extends Plan {
 
   async execute(predicate: Predicate): Promise<Boolean> {
     if (this.stopped) throw ['stopped'] // if stopped then quit
-    await this.subIntention({
-      type: DesireType.GO_TO,
-      destination: predicate.destination,
-      utility: predicate.utility,
-    })
+
+    try {
+      await this.subIntention({
+        type: DesireType.GO_TO,
+        destination: predicate.destination,
+        utility: predicate.utility,
+      })
+    } catch (error) {
+      throw ['collision']
+    }
 
     if (this.stopped) throw ['stopped'] // if stopped then quit
     const parcels = await client.drop()

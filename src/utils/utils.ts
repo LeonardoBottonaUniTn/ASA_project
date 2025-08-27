@@ -1,5 +1,6 @@
 import { Agent, Grid, Parcel, Path, Point, TileType } from '../types/index.js'
 import { beliefSet, pathFinder } from '../DeliverooDriver.js'
+import config, { GameMode } from '../config.js'
 
 /**
  * Calculates the Manhattan distance between two points.
@@ -55,6 +56,65 @@ export function findClosestDeliveryZone(point: Point): {
     deliveryZone: closestDeliveryZone,
     path: closestPath,
   }
+}
+
+/**
+ * Finds an available, walkable, and reachable position next to the teammate.
+ * This is useful for resolving situations where the teammate is blocking a path.
+ * @returns {Point | null} An available point near the teammate, or null if none is found.
+ */
+export function findAvailablePositionNearTeammate(): Point | null {
+  const teammate = beliefSet.getTeammate()
+  const me = beliefSet.getMe()
+  if (!teammate || !me) {
+    return null
+  }
+
+  const grid = beliefSet.getGrid()
+  if (!grid) {
+    return null
+  }
+
+  const teammatePos = { x: Math.round(teammate.x), y: Math.round(teammate.y) }
+  const myPos = { x: Math.round(me.x), y: Math.round(me.y) }
+
+  const directions = [
+    { dx: 0, dy: 1 }, // up
+    { dx: 0, dy: -1 }, // down
+    { dx: -1, dy: 0 }, // left
+    { dx: 1, dy: 0 }, // right
+  ]
+
+  const occupiedPositions = beliefSet.getOccupiedPositions()
+
+  for (const dir of directions) {
+    const neighborPos = { x: teammatePos.x + dir.dx, y: teammatePos.y + dir.dy }
+
+    // Check bounds
+    if (neighborPos.x < 0 || neighborPos.x >= grid.width || neighborPos.y < 0 || neighborPos.y >= grid.height) {
+      continue
+    }
+
+    // Check if walkable
+    const tile = grid.tiles[neighborPos.y][neighborPos.x]
+    if (tile.type === TileType.NonWalkable) {
+      continue
+    }
+
+    // Check if occupied
+    const neighborKey = `${neighborPos.x},${neighborPos.y}`
+    if (occupiedPositions.has(neighborKey)) {
+      continue
+    }
+
+    // Check if reachable from my position
+    const path = pathFinder.findPath(myPos, neighborPos)
+    if (path) {
+      return neighborPos // Found a reachable, available position
+    }
+  }
+
+  return null // No suitable position found
 }
 
 /**
@@ -257,10 +317,8 @@ export function calculateParcelThreat(parcel: Parcel): number {
 
   for (const agent of otherAgents.values()) {
     // Calculate actual distance to the parcel using pathfinder
-    const distanceToParcel = pathFinder.findPath(
-      { x: Math.round(agent.x), y: Math.round(agent.y) },
-      { x: parcel.x, y: parcel.y },
-    )?.cost
+    const path = pathFinder.findPath({ x: Math.round(agent.x), y: Math.round(agent.y) }, { x: parcel.x, y: parcel.y })
+    const distanceToParcel = path?.cost
 
     // Avoid division by zero and threat from an agent already on the parcel
     if (distanceToParcel == null || distanceToParcel < 1) continue
@@ -302,6 +360,13 @@ export function calculateParcelThreat(parcel: Parcel): number {
 /**
  * Computes the longest path between any two strategic points on the map
  * (parcel generators and delivery zones).
+ *
+ * To optimize performance, this function first identifies the top K pairs of
+ * points with the largest Manhattan distance. It then computes the actual
+ * path cost for these candidate pairs using the A* algorithm and returns the
+ * highest cost found. This avoids running expensive pathfinding on every
+ * possible pair of points.
+ *
  * @returns {number} The length of the longest path found.
  */
 export function computeLongestPath(): number {
@@ -309,34 +374,56 @@ export function computeLongestPath(): number {
   const deliveryZones = beliefSet.getDeliveryZones()
   const strategicPoints = [...parcelGenerators, ...deliveryZones]
 
-  let longestPath = 0
-
   if (strategicPoints.length < 2) {
     return 0
   }
 
+  const K = 10 // Consider top K points with largest manhattan distance
+  const allPairs: { p1: Point; p2: Point; distance: number }[] = []
+
   for (let i = 0; i < strategicPoints.length; i++) {
     for (let j = i + 1; j < strategicPoints.length; j++) {
-      const path = pathFinder.findPath(strategicPoints[i], strategicPoints[j])
-      if (path && path.cost > longestPath) {
-        longestPath = path.cost
-      }
+      const p1 = strategicPoints[i]
+      const p2 = strategicPoints[j]
+      const distance = manhattanDistance(p1, p2)
+      allPairs.push({ p1, p2, distance })
+    }
+  }
+
+  allPairs.sort((a, b) => b.distance - a.distance)
+  const candidates = allPairs.slice(0, K)
+
+  let longestPath = 0
+
+  for (const { p1, p2 } of candidates) {
+    const path = pathFinder.findPath(p1, p2)
+    if (path && path.cost > longestPath) {
+      longestPath = path.cost
     }
   }
 
   console.info(`Computed longest path: ${longestPath}`)
   return longestPath
 }
-
 /**
  * Returns a random parcel generator from the agent's assigned Voronoi region.
  * This is used for exploration when the agent is idle.
  * @returns {Point | null} A random parcel generator point, or null if none are assigned.
  */
 export function getParcelGeneratorInAssignedArea(): Point | null {
+  const mode = config.mode
   const me = beliefSet.getMe()
   if (!me) return null
 
+  // In single agent mode, return random generator
+  if (mode === GameMode.SingleAgent) {
+    const generators = beliefSet.getParcelGenerators()
+    if (generators.length === 0) return null
+    const randomIndex = Math.floor(Math.random() * generators.length)
+    return generators[randomIndex]
+  }
+
+  // In CoOp mode, use Voronoi partitioning
   const partitioning = beliefSet.getMapPartitioning()
   const myGenerators: Point[] = []
 
@@ -355,10 +442,23 @@ export function getParcelGeneratorInAssignedArea(): Point | null {
   return myGenerators[randomIndex]
 }
 
+export const getRandomPosition = () => {
+  const grid = beliefSet.getGrid()!
+  const randomX = Math.floor(Math.random() * grid.width)
+  const randomY = Math.floor(Math.random() * grid.height)
+  return { x: randomX, y: randomY }
+}
+
 /**
- * Computes the Voronoi-based partitioning of parcel generators the two
- * collaboarating agents.
- * Each generator is assigned to the nearest agent based on shortest-path distance.
+ * Computes the Voronoi-based partitioning of parcel generators for the two
+ * collaborating agents, with an added capacity constraint.
+ *
+ * First, it assigns each generator to the closest agent (standard Voronoi).
+ * Then, it iteratively rebalances the partitions to ensure each agent is
+ * responsible for a roughly equal number of generators. Rebalancing occurs
+ * by moving generators from over-capacity agents to under-capacity agents,
+ * prioritizing reassignments with the lowest cost (smallest increase in distance).
+ *
  * This method is called when the partitioning needs to be updated,
  * e.g., when a new parcel spawns or a delivery is completed.
  * @returns A Map where keys are generator coordinates ("x,y") and values are agent IDs
@@ -377,24 +477,104 @@ export function computeParcelGeneratorPartitioning(): Map<string, string> {
     return partitioning
   }
 
+  // Step 1: For each generator, find the distance to each agent.
+  const generatorAgentDistances = new Map<string, { agentId: string; distance: number }[]>()
   for (const generator of generators) {
-    let bestAgentId: string | null = null
-    let minDistance = Infinity
-
+    const distances: { agentId: string; distance: number }[] = []
     for (const agent of allAgents) {
       const path = pathFinder.findPath({ x: Math.round(agent.x), y: Math.round(agent.y) }, generator)
-      const distance = path?.cost
+      const pathCost = path?.cost ?? Infinity
+      distances.push({ agentId: agent.id, distance: pathCost })
+    }
+    distances.sort((a, b) => a.distance - b.distance)
+    const generatorKey = `${generator.x},${generator.y}`
+    generatorAgentDistances.set(generatorKey, distances)
+  }
 
-      if (distance && distance <= minDistance) {
-        minDistance = distance
-        bestAgentId = agent.id
+  // Step 2: Initial Voronoi partitioning.
+  const agentLoads = new Map<string, string[]>(allAgents.map((a) => [a.id, []]))
+  for (const [generatorKey, distances] of generatorAgentDistances.entries()) {
+    const bestAgentId = distances[0]?.agentId
+    if (bestAgentId && distances[0].distance !== Infinity) {
+      partitioning.set(generatorKey, bestAgentId)
+      agentLoads.get(bestAgentId)?.push(generatorKey)
+    }
+  }
+
+  // Step 3: Rebalance partitions to meet capacity constraints.
+  const numAgents = allAgents.length
+  const targetCapacity = Math.floor(generators.length / numAgents)
+  const agentsWithExtraCapacity = generators.length % numAgents
+
+  // Determine capacity for each agent
+  const agentCapacity = new Map<string, number>()
+  allAgents.forEach((agent, index) => {
+    agentCapacity.set(agent.id, targetCapacity + (index < agentsWithExtraCapacity ? 1 : 0))
+  })
+
+  let rebalancingOccurred = true
+  while (rebalancingOccurred) {
+    rebalancingOccurred = false
+
+    const overCapacityAgents = allAgents.filter(
+      (agent) => (agentLoads.get(agent.id)?.length ?? 0) > (agentCapacity.get(agent.id) ?? 0),
+    )
+    const underCapacityAgents = allAgents.filter(
+      (agent) => (agentLoads.get(agent.id)?.length ?? 0) < (agentCapacity.get(agent.id) ?? 0),
+    )
+
+    if (overCapacityAgents.length === 0 || underCapacityAgents.length === 0) {
+      break // Balanced
+    }
+
+    let bestReassignment: {
+      generatorKey: string
+      fromAgentId: string
+      toAgentId: string
+      cost: number
+    } | null = null
+
+    for (const fromAgent of overCapacityAgents) {
+      const fromAgentId = fromAgent.id
+      const assignedGenerators = agentLoads.get(fromAgentId) ?? []
+
+      for (const generatorKey of assignedGenerators) {
+        const distances = generatorAgentDistances.get(generatorKey)
+        if (!distances) continue
+
+        const currentDist = distances.find((d) => d.agentId === fromAgentId)?.distance ?? Infinity
+
+        for (const toAgent of underCapacityAgents) {
+          const toAgentId = toAgent.id
+          const newDist = distances.find((d) => d.agentId === toAgentId)?.distance ?? Infinity
+          const cost = newDist - currentDist
+
+          if (!bestReassignment || cost < bestReassignment.cost) {
+            bestReassignment = { generatorKey, fromAgentId, toAgentId, cost }
+          }
+        }
       }
     }
 
-    if (bestAgentId) {
-      const generatorKey = `${generator.x},${generator.y}`
-      partitioning.set(generatorKey, bestAgentId)
+    if (bestReassignment) {
+      const { generatorKey, fromAgentId, toAgentId } = bestReassignment
+
+      // Perform reassignment
+      partitioning.set(generatorKey, toAgentId)
+
+      // Update loads
+      const fromAgentLoad = agentLoads.get(fromAgentId)
+      if (fromAgentLoad) {
+        agentLoads.set(
+          fromAgentId,
+          fromAgentLoad.filter((g) => g !== generatorKey),
+        )
+      }
+      agentLoads.get(toAgentId)?.push(generatorKey)
+
+      rebalancingOccurred = true
     }
   }
+
   return partitioning
 }
