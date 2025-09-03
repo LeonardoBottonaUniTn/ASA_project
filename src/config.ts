@@ -20,21 +20,31 @@ interface Config {
   }
   mode: GameMode
   usePddl: boolean
+  TEAM_KEY: string
+}
+
+const agentId = process.env.AGENT_ID
+let token
+if (agentId === '1') {
+  token = process.env.CLIENT_TOKEN_1
+} else if (agentId === '2') {
+  token = process.env.CLIENT_TOKEN_2
 }
 
 const config: Config = {
   // Connection details for the Deliveroo simulation environment
   api: {
     host: process.env.API_HOST || 'http://localhost:8080',
-    token: process.env.CLIENT_TOKEN,
+    token: token,
   },
 
   // Agent-specific settings
   agent: {
     name: 'BDI-Agent-007',
   },
-  mode: GameMode.SingleAgent,
-  usePddl: true, // use PDDL to generate plans
+  mode: GameMode.CoOp,
+  usePddl: false, // use PDDL to generate GO_TO plans
+  TEAM_KEY: 'leonardo-gabriele-team',
 }
 
 export default config

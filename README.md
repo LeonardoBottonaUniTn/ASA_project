@@ -64,6 +64,7 @@ package.json               # Project dependencies
    Add tokens
 
 4. **Run the project: single agent**
+   Set the token in the config file as `CLIENT_TOKEN_1`
 
    ```bash
    npm run start:agent1
@@ -71,11 +72,19 @@ package.json               # Project dependencies
 
 5. **Run the project: multi agent**
 
+   Set the token in the config file as `CLIENT_TOKEN_1`, oper a terminal window
+   and run:
+
    ```bash
-   npm run start:agent1 && npm run start:agent2
+   npm run start:agent1
    ```
 
-## Requirements
+   Then, set the token in the config file as `CLIENT_TOKEN_2`
+   and run:
+
+   ```bash
+   npm run start:agent2
+   ```
 
 - Node.js (>= 14.x)
 - TypeScript
