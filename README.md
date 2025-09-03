@@ -47,23 +47,29 @@ README.md                  # Project documentation
 
 1. **Install dependencies:**
 
+   ```bash
+   git clone [...](https://github.com/LeonardoBottonaUniTn/ASA_project.git)
    ```
-   git clone ...
-   ```
+
 2. **Install dependencies**
 
-   ```
+   ```bash
    npm install
    ```
-3. **Run the project:**
+3. **Usage**
+
+	Modify `src/config.ts` to adjust simulation parameters. The main entry point is `src/DeliverooDriver.ts`.
+	Add tokens
+
+4. **Run the project: single agent**
 
    ```bash
    npm start
    ```
-4. **Build the project:**
+5. **Run the project: multi agent**
 
    ```bash
-   npm run build
+   npm run start:agent1 e npm run start:agent2
    ```
 
 ## Requirements
@@ -71,9 +77,7 @@ README.md                  # Project documentation
 - Node.js (>= 14.x)
 - TypeScript
 
-## Usage
 
-Modify `src/config.ts` to adjust simulation parameters. The main entry point is `src/DeliverooDriver.ts`.
 
 ## Planning
 
