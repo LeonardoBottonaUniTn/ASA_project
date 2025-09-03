@@ -46,33 +46,28 @@ package.json               # Project dependencies
 
 ## Getting Started
 
-1. **Install dependencies:**
-
-   ```bash
-   git clone [...](https://github.com/LeonardoBottonaUniTn/ASA_project.git)
-   ```
-
-2. **Install dependencies**
+1. **Install dependencies**
 
    ```bash
    npm install
    ```
 
-3. **Usage**
+2. **Usage**
 
    Modify `src/config.ts` to adjust simulation parameters. The main entry point is `src/DeliverooDriver.ts`.
    Add tokens
 
-4. **Run the project: single agent**
+3. **Run the project: single agent**
+   
    Set the token in the config file as `CLIENT_TOKEN_1`
 
    ```bash
    npm run start:agent1
    ```
 
-5. **Run the project: multi agent**
+4. **Run the project: multi agent**
 
-   Set the token in the config file as `CLIENT_TOKEN_1`, oper a terminal window
+   Set the token in the config file as `CLIENT_TOKEN_1`, open a terminal window
    and run:
 
    ```bash
