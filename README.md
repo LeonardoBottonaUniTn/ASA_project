@@ -1,7 +1,19 @@
-# ASA Project
+# Autonomous Software Agent Project
+
+
+
+[![Node.js](https://img.shields.io/badge/Node.js-16%2B-green.svg)](https://nodejs.org/)
+[![PDDL](https://img.shields.io/badge/PDDL-Planning-blue.svg)](https://planning.wiki/)
+
+> **Authors:** Leonardo Bottona, Gabriele Masciulli 
+> **Course:** Autonomous Software Agents  
+> **Institution:** University of Trento  
+> **Academic Year:** 2024-2025
+
+---
 
 This repository contains the source code for an agent-based system developed for
-the Autonomous Software Architectures Agents (ASA) course. The project simulates
+the Autonomous Software Agents (ASA) course. The project simulates
 a multi-agent environment, where they plan and execute delivery tasks using
 PDDL-based planning and custom logic.
 
@@ -55,7 +67,6 @@ package.json               # Project dependencies
 2. **Usage**
 
    Modify `src/config.ts` to adjust simulation parameters. The main entry point is `src/DeliverooDriver.ts`.
-   Add tokens
 
 3. **Run the project: single agent**
    
