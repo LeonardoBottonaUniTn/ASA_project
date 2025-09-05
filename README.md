@@ -1,5 +1,7 @@
 # Autonomous Software Agent Project
-![ASA Project Logo](https://postimg.cc/m1ycdnmD)
+<p align="center">
+    <img src="https://i.postimg.cc/nr6vLb7v/temp-Imageb-RTH7u.avif" alt="drawing" width="500"/>
+</p>
 [![Node.js](https://img.shields.io/badge/Node.js-16%2B-green.svg)](https://nodejs.org/)
 [![PDDL](https://img.shields.io/badge/PDDL-Planning-blue.svg)](https://planning.wiki/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-4.0%2B-blue.svg)](https://www.typescriptlang.org/)
