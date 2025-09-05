@@ -1,11 +1,10 @@
 # Autonomous Software Agent Project
 
-
-
 [![Node.js](https://img.shields.io/badge/Node.js-16%2B-green.svg)](https://nodejs.org/)
 [![PDDL](https://img.shields.io/badge/PDDL-Planning-blue.svg)](https://planning.wiki/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-4.0%2B-blue.svg)](https://www.typescriptlang.org/)
 
-> **Authors:** Leonardo Bottona, Gabriele Masciulli 
+> **Authors:** Leonardo Bottona, Gabriele Masciulli
 > **Course:** Autonomous Software Agents  
 > **Institution:** University of Trento  
 > **Academic Year:** 2024-2025
@@ -28,6 +27,8 @@ PDDL-based planning and custom logic.
 
 ```
 src/
+	Report.pdf               # Project report
+	Presentation.pdf         # Project presentation
 	config.ts                # Configuration settings
 	DeliverooDriver.ts       # Main driver for the simulation
 	lib/
@@ -69,7 +70,7 @@ package.json               # Project dependencies
    Modify `src/config.ts` to adjust simulation parameters. The main entry point is `src/DeliverooDriver.ts`.
 
 3. **Run the project: single agent**
-   
+
    Set the token in the config file as `CLIENT_TOKEN_1`
 
    ```bash
